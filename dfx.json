@@ -1,0 +1,26 @@
+{
+  "canisters": {
+    "vault_app0_backend": {
+      "main": "src/vault_app0_backend/main.mo",
+      "type": "motoko"
+    },
+    "vault_app0_frontend": {
+      "dependencies": [
+        "vault_app0_backend"
+      ],
+      "source": [
+        "src/vault_app0_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "vault_app0_frontend"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
