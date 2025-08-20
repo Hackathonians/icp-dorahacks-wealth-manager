@@ -1,30 +1,31 @@
-import { useState } from 'react';
-import { vault_app0_backend } from 'declarations/vault_app0_backend';
+import React from 'react';
+import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from './contexts/AuthContext';
+import Header from './components/Header';
+import Dashboard from './components/Dashboard';
+import './index.scss';
 
 function App() {
-  const [greeting, setGreeting] = useState('');
-
-  function handleSubmit(event) {
-    event.preventDefault();
-    const name = event.target.elements.name.value;
-    vault_app0_backend.greet(name).then((greeting) => {
-      setGreeting(greeting);
-    });
-    return false;
-  }
-
   return (
-    <main>
-      <img src="/logo2.svg" alt="DFINITY logo" />
-      <br />
-      <br />
-      <form action="#" onSubmit={handleSubmit}>
-        <label htmlFor="name">Enter your name: &nbsp;</label>
-        <input id="name" alt="Name" type="text" />
-        <button type="submit">Click Me!</button>
-      </form>
-      <section id="greeting">{greeting}</section>
-    </main>
+    <AuthProvider>
+      <div className="min-h-screen">
+        <Header />
+        <main className="container mx-auto px-4 py-8 animate-fadeIn">
+          <Dashboard />
+        </main>
+        <Toaster 
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: 'rgba(255, 255, 255, 0.9)',
+              color: '#374151',
+              borderRadius: '8px',
+            },
+          }}
+        />
+      </div>
+    </AuthProvider>
   );
 }
 
