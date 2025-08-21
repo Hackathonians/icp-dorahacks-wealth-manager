@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
-const VaultSection = ({ userVaultInfo, onRefresh }) => {
+const VaultSection = ({ userVaultEntries, onRefresh }) => {
   const { actor } = useAuth();
   const [lockAmount, setLockAmount] = useState('');
   const [lockDuration, setLockDuration] = useState('');
   const [useCustomDuration, setUseCustomDuration] = useState(false);
+  const [isFlexibleStaking, setIsFlexibleStaking] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleLockTokens = async (e) => {
@@ -25,11 +26,14 @@ const VaultSection = ({ userVaultInfo, onRefresh }) => {
       setLoading(true);
       const amount = Math.floor(Number(lockAmount) * 1000000); // Convert to smallest unit
       const duration = useCustomDuration ? [Number(lockDuration)] : []; // Optional parameter
-      const result = await actor.vault_lock_tokens(amount, duration);
+      const flexible = [isFlexibleStaking]; // Optional parameter for flexible staking
+      const result = await actor.vault_lock_tokens(amount, duration, flexible);
       
       if ('ok' in result) {
-        const durationText = useCustomDuration ? ` for ${lockDuration} minutes` : ' (default duration)';
-        toast.success(`Tokens locked successfully${durationText}!`);
+        const entryId = Number(result.ok);
+        const stakingType = isFlexibleStaking ? 'flexible staking' : 'time-locked staking';
+        const durationText = isFlexibleStaking ? '' : (useCustomDuration ? ` for ${lockDuration} minutes` : ' (default duration)');
+        toast.success(`Tokens locked successfully as ${stakingType}${durationText}! Entry ID: ${entryId}`);
         setLockAmount('');
         setLockDuration('');
         onRefresh();
@@ -44,14 +48,14 @@ const VaultSection = ({ userVaultInfo, onRefresh }) => {
     }
   };
 
-  const handleUnlockTokens = async () => {
+  const handleUnlockTokens = async (entryId) => {
     try {
       setLoading(true);
-      const result = await actor.vault_unlock_tokens();
+      const result = await actor.vault_unlock_tokens(entryId);
       
       if ('ok' in result) {
         const unlockedAmount = Number(result.ok) / 1000000;
-        toast.success(`Successfully unlocked ${unlockedAmount.toFixed(2)} USDX!`);
+        toast.success(`Successfully unlocked ${unlockedAmount.toFixed(2)} USDX from entry ${entryId}!`);
         onRefresh();
       } else {
         toast.error(result.err);
@@ -86,74 +90,85 @@ const VaultSection = ({ userVaultInfo, onRefresh }) => {
     <div className="bg-white rounded-lg shadow-lg p-6">
       <h2 className="text-xl font-bold text-gray-900 mb-6">Vault Operations</h2>
 
-      {userVaultInfo ? (
-        <div className="space-y-6">
-          {/* Current Lock Info */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-green-800 mb-3">Your Locked Tokens</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-green-700">Amount:</span>
-                <span className="font-semibold text-green-900">
-                  {(Number(userVaultInfo.amount) / 1000000).toFixed(2)} USDX
+      {/* Existing Vault Entries */}
+      {userVaultEntries && userVaultEntries.length > 0 && (
+        <div className="space-y-4 mb-6">
+          <h3 className="text-lg font-semibold text-gray-800">Your Staking Positions</h3>
+          {userVaultEntries.map((entry) => (
+            <div key={entry.id} className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex justify-between items-start mb-3">
+                <h4 className="text-md font-semibold text-green-800">
+                  Entry #{entry.id} - {entry.is_flexible ? 'Flexible Staking' : 'Time-Locked Staking'}
+                </h4>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  entry.can_unlock 
+                    ? 'bg-blue-100 text-blue-800' 
+                    : 'bg-orange-100 text-orange-800'
+                }`}>
+                  {entry.can_unlock ? 'Ready to Unlock' : 'Locked'}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-green-700">Locked At:</span>
-                <span className="font-semibold text-green-900">
-                  {formatTimestamp(userVaultInfo.locked_at)}
-                </span>
-              </div>
-              {userVaultInfo.unlock_time && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-green-700">Unlock Time:</span>
-                    <span className="font-semibold text-green-900">
-                      {formatTimestamp(userVaultInfo.unlock_time)}
+              
+              <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                <div>
+                  <span className="text-green-700">Amount:</span>
+                  <span className="font-semibold text-green-900 ml-2">
+                    {(Number(entry.amount) / 1000000).toFixed(2)} USDX
+                  </span>
+                </div>
+                <div>
+                  <span className="text-green-700">Locked At:</span>
+                  <span className="font-semibold text-green-900 ml-2">
+                    {formatTimestamp(entry.locked_at)}
+                  </span>
+                </div>
+                {entry.unlock_time && (
+                  <>
+                    <div>
+                      <span className="text-green-700">Unlock Time:</span>
+                      <span className="font-semibold text-green-900 ml-2">
+                        {formatTimestamp(entry.unlock_time)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-green-700">Status:</span>
+                      <span className={`font-semibold ml-2 ${entry.can_unlock ? 'text-blue-600' : 'text-orange-600'}`}>
+                        {getTimeUntilUnlock(entry.unlock_time)}
+                      </span>
+                    </div>
+                  </>
+                )}
+                {entry.is_flexible && (
+                  <div className="col-span-2">
+                    <span className="text-green-700">Type:</span>
+                    <span className="font-semibold text-blue-600 ml-2">
+                      Flexible - Can withdraw anytime
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-green-700">Status:</span>
-                    <span className={`font-semibold ${userVaultInfo.can_unlock ? 'text-blue-600' : 'text-orange-600'}`}>
-                      {getTimeUntilUnlock(userVaultInfo.unlock_time)}
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Unlock Button */}
-          <button
-            onClick={handleUnlockTokens}
-            disabled={!userVaultInfo.can_unlock || loading}
-            className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
-              userVaultInfo.can_unlock && !loading
-                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {loading ? 'Processing...' : 'Unlock Tokens'}
-          </button>
-
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
+                )}
               </div>
-              <div>
-                <h4 className="text-sm font-medium text-yellow-800">Note</h4>
-                <p className="text-sm text-yellow-700">
-                  You must unlock your current tokens before locking a new amount.
-                </p>
-              </div>
+
+              <button
+                onClick={() => handleUnlockTokens(entry.id)}
+                disabled={!entry.can_unlock || loading}
+                className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
+                  entry.can_unlock && !loading
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                {loading ? 'Processing...' : `Unlock Entry #${entry.id}`}
+              </button>
             </div>
-          </div>
+          ))}
         </div>
-      ) : (
-        <div className="space-y-6">
+      )}
+
+      {/* New Staking Form */}
+      <div className="space-y-6">
+        <div className="border-t pt-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Create New Staking Position</h3>
+          <div className="space-y-6">
           {/* Lock Form */}
           <form onSubmit={handleLockTokens} className="space-y-4">
             <div>
@@ -173,59 +188,97 @@ const VaultSection = ({ userVaultInfo, onRefresh }) => {
               />
             </div>
 
-            {/* Lock Duration Options */}
+            {/* Staking Type */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Lock Duration
+                Staking Type
               </label>
               <div className="space-y-3">
                 <div className="flex items-center">
                   <input
                     type="radio"
-                    id="defaultDuration"
-                    name="durationType"
-                    checked={!useCustomDuration}
-                    onChange={() => setUseCustomDuration(false)}
+                    id="flexibleStaking"
+                    name="stakingType"
+                    checked={isFlexibleStaking}
+                    onChange={() => setIsFlexibleStaking(true)}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                   />
-                  <label htmlFor="defaultDuration" className="ml-2 text-sm text-gray-700">
-                    Use default duration (1 hour)
+                  <label htmlFor="flexibleStaking" className="ml-2 text-sm text-gray-700">
+                    <span className="font-medium text-blue-600">Flexible Staking</span> - Withdraw anytime
                   </label>
                 </div>
                 
                 <div className="flex items-center">
                   <input
                     type="radio"
-                    id="customDuration"
-                    name="durationType"
-                    checked={useCustomDuration}
-                    onChange={() => setUseCustomDuration(true)}
+                    id="timeLockedStaking"
+                    name="stakingType"
+                    checked={!isFlexibleStaking}
+                    onChange={() => setIsFlexibleStaking(false)}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                   />
-                  <label htmlFor="customDuration" className="ml-2 text-sm text-gray-700">
-                    Custom duration (minutes)
+                  <label htmlFor="timeLockedStaking" className="ml-2 text-sm text-gray-700">
+                    <span className="font-medium text-green-600">Time-Locked Staking</span> - Higher rewards, locked period
                   </label>
                 </div>
-                
-                {useCustomDuration && (
-                  <div className="ml-6">
-                    <input
-                      type="number"
-                      id="lockDuration"
-                      value={lockDuration}
-                      onChange={(e) => setLockDuration(e.target.value)}
-                      placeholder="Enter duration in minutes (e.g., 5, 30, 60)"
-                      min="1"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required={useCustomDuration}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      For testing: try 1-5 minutes. For production: 60+ minutes recommended.
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
+
+            {/* Lock Duration Options (only for time-locked staking) */}
+            {!isFlexibleStaking && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lock Duration
+                </label>
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="defaultDuration"
+                      name="durationType"
+                      checked={!useCustomDuration}
+                      onChange={() => setUseCustomDuration(false)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <label htmlFor="defaultDuration" className="ml-2 text-sm text-gray-700">
+                      Use default duration (1 hour)
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="customDuration"
+                      name="durationType"
+                      checked={useCustomDuration}
+                      onChange={() => setUseCustomDuration(true)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <label htmlFor="customDuration" className="ml-2 text-sm text-gray-700">
+                      Custom duration (minutes)
+                    </label>
+                  </div>
+                  
+                  {useCustomDuration && (
+                    <div className="ml-6">
+                      <input
+                        type="number"
+                        id="lockDuration"
+                        value={lockDuration}
+                        onChange={(e) => setLockDuration(e.target.value)}
+                        placeholder="Enter duration in minutes (e.g., 5, 30, 60)"
+                        min="1"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required={useCustomDuration}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        For testing: try 1-5 minutes. For production: 60+ minutes recommended.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             
             <button
               type="submit"
@@ -246,14 +299,15 @@ const VaultSection = ({ userVaultInfo, onRefresh }) => {
               <div>
                 <h4 className="text-sm font-medium text-blue-800">How it works</h4>
                 <p className="text-sm text-blue-700">
-                  Lock your USDX tokens in the vault to earn dividends. Tokens are locked for 1 hour by default (configurable).
-                  During this time, you're eligible for any dividend distributions made by the admin.
+                  Stake your USDX tokens to earn dividends. Choose between flexible staking (withdraw anytime) or 
+                  time-locked staking (higher rewards, locked period). All staked tokens are eligible for dividend distributions.
                 </p>
               </div>
             </div>
           </div>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

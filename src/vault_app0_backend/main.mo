@@ -29,6 +29,7 @@ persistent actor VaultApp {
   private var vault_lock_period_nanoseconds : Nat64 = 3600000000000; // 1 hour in nanoseconds (for debugging)
   private var vault_total_locked : Nat = 0;
   private var dividend_counter : Nat = 0;
+  private var vault_entry_counter : Nat = 0; // Counter for unique vault entry IDs
 
   // Helper functions
   private func accountEqual(a1 : Types.Account, a2 : Types.Account) : Bool {
@@ -89,8 +90,9 @@ persistent actor VaultApp {
   private transient var balances = HashMap.HashMap<Types.Account, Nat>(10, accountEqual, accountHash);
   private transient var allowances = HashMap.HashMap<(Types.Account, Types.Account), Types.Allowance>(10, allowanceKeyEqual, allowanceKeyHash);
 
-  // Vault state
-  private transient var vault_entries = HashMap.HashMap<Principal, Types.VaultEntry>(10, Principal.equal, Principal.hash);
+  // Vault state - changed to support multiple entries per user
+  private transient var vault_entries = HashMap.HashMap<Nat, Types.VaultEntry>(10, Nat.equal, func(n : Nat) : Nat32 { Nat32.fromNat(n % (2 ** 32 - 1)) });
+  private transient var user_vault_entries = HashMap.HashMap<Principal, [Nat]>(10, Principal.equal, Principal.hash);
   private transient var dividend_history = HashMap.HashMap<Nat, Types.DividendDistribution>(10, Nat.equal, func(n : Nat) : Nat32 { Nat32.fromNat(n % (2 ** 32 - 1)) });
   private transient var user_dividend_claims = HashMap.HashMap<(Principal, Nat), Bool>(
     10,
@@ -277,17 +279,52 @@ persistent actor VaultApp {
     #ok(tx_id);
   };
 
+  // Admin emergency withdrawal - force unlock any vault entry
+  public shared (msg) func admin_emergency_withdrawal(entry_id : Nat) : async Result.Result<Nat, Text> {
+    let caller = msg.caller;
+    if (not isAdmin(caller)) {
+      return #err("Only admin can perform emergency withdrawal");
+    };
+
+    switch (vault_entries.get(entry_id)) {
+      case null {
+        #err("Vault entry not found");
+      };
+      case (?entry) {
+        let user_account : Types.Account = {
+          owner = entry.owner;
+          subaccount = null;
+        };
+
+        // Return tokens to user
+        let admin_balance = getBalance(admin_account);
+        setBalance(admin_account, admin_balance - entry.amount);
+        let user_balance = getBalance(user_account);
+        setBalance(user_account, user_balance + entry.amount);
+
+        // Remove entry
+        vault_entries.delete(entry_id);
+
+        // Update user's entry list
+        let current_entries = Option.get(user_vault_entries.get(entry.owner), []);
+        let updated_entries = Array.filter<Nat>(current_entries, func(id) { id != entry_id });
+        if (updated_entries.size() == 0) {
+          user_vault_entries.delete(entry.owner);
+        } else {
+          user_vault_entries.put(entry.owner, updated_entries);
+        };
+
+        vault_total_locked -= entry.amount;
+
+        #ok(entry.amount);
+      };
+    };
+  };
+
   // Vault functions
-  public shared (msg) func vault_lock_tokens(amount : Nat, lock_duration_minutes : ?Nat) : async Result.Result<(), Text> {
+  public shared (msg) func vault_lock_tokens(amount : Nat, lock_duration_minutes : ?Nat, is_flexible : ?Bool) : async Result.Result<Nat, Text> {
     let caller = msg.caller;
     let caller_account : Types.Account = { owner = caller; subaccount = null };
-
-    switch (vault_entries.get(caller)) {
-      case (?_existing) {
-        return #err("User already has tokens locked. Unlock first before locking new amount.");
-      };
-      case null {};
-    };
 
     let user_balance = getBalance(caller_account);
     if (user_balance < amount) {
@@ -298,54 +335,100 @@ persistent actor VaultApp {
     let admin_balance = getBalance(admin_account);
     setBalance(admin_account, admin_balance + amount);
 
-    // Calculate lock duration: use custom duration if provided, otherwise use default
-    let lock_duration_nanoseconds = switch (lock_duration_minutes) {
-      case (?minutes) { Nat64.fromNat(minutes * 60 * 1000000000) }; // Convert minutes to nanoseconds
-      case null { vault_lock_period_nanoseconds }; // Use default
+    // Generate unique entry ID
+    vault_entry_counter += 1;
+    let entry_id = vault_entry_counter;
+
+    // Determine if this is flexible staking
+    let flexible_staking = Option.get(is_flexible, false);
+
+    // Calculate unlock time based on staking type
+    let unlock_time = if (flexible_staking) {
+      null // Flexible staking - can withdraw anytime
+    } else {
+      // Time-locked staking
+      let lock_duration_nanoseconds = switch (lock_duration_minutes) {
+        case (?minutes) { Nat64.fromNat(minutes * 60 * 1000000000) }; // Convert minutes to nanoseconds
+        case null { vault_lock_period_nanoseconds }; // Use default
+      };
+      ?(now() + lock_duration_nanoseconds);
     };
 
     let entry : Types.VaultEntry = {
+      id = entry_id;
       owner = caller;
       amount = amount;
       locked_at = now();
-      unlock_time = ?(now() + lock_duration_nanoseconds);
+      unlock_time = unlock_time;
+      is_flexible = flexible_staking;
     };
 
-    vault_entries.put(caller, entry);
+    // Store the entry
+    vault_entries.put(entry_id, entry);
+
+    // Update user's entry list
+    let current_entries = Option.get(user_vault_entries.get(caller), []);
+    let updated_entries = Array.append(current_entries, [entry_id]);
+    user_vault_entries.put(caller, updated_entries);
+
     vault_total_locked += amount;
 
-    #ok(());
+    #ok(entry_id);
   };
 
-  public shared (msg) func vault_unlock_tokens() : async Result.Result<Nat, Text> {
+  public shared (msg) func vault_unlock_tokens(entry_id : Nat) : async Result.Result<Nat, Text> {
     let caller = msg.caller;
     let caller_account : Types.Account = { owner = caller; subaccount = null };
 
-    switch (vault_entries.get(caller)) {
+    switch (vault_entries.get(entry_id)) {
       case null {
-        #err("No tokens locked for this user");
+        #err("Vault entry not found");
       };
       case (?entry) {
-        switch (entry.unlock_time) {
-          case null {
-            #err("Tokens are permanently locked");
-          };
-          case (?unlock_time) {
-            if (now() < unlock_time) {
-              #err("Tokens are still locked. Unlock time: " # Nat64.toText(unlock_time));
-            } else {
-              let admin_balance = getBalance(admin_account);
-              setBalance(admin_account, admin_balance - entry.amount);
-              let user_balance = getBalance(caller_account);
-              setBalance(caller_account, user_balance + entry.amount);
+        // Verify ownership
+        if (not Principal.equal(entry.owner, caller)) {
+          return #err("You don't own this vault entry");
+        };
 
-              vault_entries.delete(caller);
-              vault_total_locked -= entry.amount;
-
-              #ok(entry.amount);
-            };
+        // Check if can unlock
+        let can_unlock = if (entry.is_flexible) {
+          true // Flexible staking can always be unlocked
+        } else {
+          switch (entry.unlock_time) {
+            case null { false }; // Should not happen for time-locked entries
+            case (?unlock_time) { now() >= unlock_time };
           };
         };
+
+        if (not can_unlock) {
+          let unlock_time_text = switch (entry.unlock_time) {
+            case null { "unknown" };
+            case (?time) { Nat64.toText(time) };
+          };
+          return #err("Tokens are still locked. Unlock time: " # unlock_time_text);
+        };
+
+        // Process unlock
+        let admin_balance = getBalance(admin_account);
+        setBalance(admin_account, admin_balance - entry.amount);
+        let user_balance = getBalance(caller_account);
+        setBalance(caller_account, user_balance + entry.amount);
+
+        // Remove entry
+        vault_entries.delete(entry_id);
+
+        // Update user's entry list
+        let current_entries = Option.get(user_vault_entries.get(caller), []);
+        let updated_entries = Array.filter<Nat>(current_entries, func(id) { id != entry_id });
+        if (updated_entries.size() == 0) {
+          user_vault_entries.delete(caller);
+        } else {
+          user_vault_entries.put(caller, updated_entries);
+        };
+
+        vault_total_locked -= entry.amount;
+
+        #ok(entry.amount);
       };
     };
   };
@@ -391,41 +474,55 @@ persistent actor VaultApp {
     let caller = msg.caller;
     let caller_account : Types.Account = { owner = caller; subaccount = null };
 
-    switch (vault_entries.get(caller)) {
-      case null {
-        return #err("No tokens locked for this user");
+    // Check if already claimed
+    let claim_key = (caller, distribution_id);
+    switch (user_dividend_claims.get(claim_key)) {
+      case (?true) {
+        return #err("Dividend already claimed for this distribution");
       };
-      case (?entry) {
-        switch (dividend_history.get(distribution_id)) {
+      case _ {};
+    };
+
+    switch (dividend_history.get(distribution_id)) {
+      case null {
+        return #err("Distribution not found");
+      };
+      case (?distribution) {
+        switch (user_vault_entries.get(caller)) {
           case null {
-            return #err("Distribution not found");
+            return #err("No tokens locked for this user");
           };
-          case (?distribution) {
-            let claim_key = (caller, distribution_id);
-            switch (user_dividend_claims.get(claim_key)) {
-              case (?true) {
-                return #err("Dividend already claimed for this distribution");
-              };
-              case _ {
-                if (entry.locked_at > distribution.distributed_at) {
-                  return #err("Tokens were locked after this dividend distribution");
+          case (?entry_ids) {
+            var total_dividend_amount = 0;
+
+            // Calculate total dividend across all eligible entries
+            for (entry_id in entry_ids.vals()) {
+              switch (vault_entries.get(entry_id)) {
+                case null {};
+                case (?entry) {
+                  if (entry.locked_at <= distribution.distributed_at) {
+                    let dividend_amount_float = Float.fromInt(entry.amount) * distribution.per_token_amount;
+                    let dividend_amount = Int.abs(Float.toInt(dividend_amount_float));
+                    total_dividend_amount += dividend_amount;
+                  };
                 };
-
-                // Calculate dividend amount using Float precision: user_locked_amount * per_token_amount
-                // This ensures fair distribution with proper decimal precision
-                let dividend_amount_float = Float.fromInt(entry.amount) * distribution.per_token_amount;
-                let dividend_amount = Int.abs(Float.toInt(dividend_amount_float));
-
-                let admin_balance = getBalance(admin_account);
-                setBalance(admin_account, admin_balance - dividend_amount);
-                let user_balance = getBalance(caller_account);
-                setBalance(caller_account, user_balance + dividend_amount);
-
-                user_dividend_claims.put(claim_key, true);
-
-                return #ok(dividend_amount);
               };
             };
+
+            if (total_dividend_amount == 0) {
+              return #err("No eligible tokens for this dividend distribution");
+            };
+
+            // Transfer dividend
+            let admin_balance = getBalance(admin_account);
+            setBalance(admin_account, admin_balance - total_dividend_amount);
+            let user_balance = getBalance(caller_account);
+            setBalance(caller_account, user_balance + total_dividend_amount);
+
+            // Mark as claimed
+            user_dividend_claims.put(claim_key, true);
+
+            return #ok(total_dividend_amount);
           };
         };
       };
@@ -449,50 +546,101 @@ persistent actor VaultApp {
     };
   };
 
-  public query func get_user_vault_info(user : Principal) : async ?{
+  public query func get_user_vault_entries(user : Principal) : async [{
+    id : Nat;
     amount : Nat;
     locked_at : Nat64;
     unlock_time : ?Nat64;
     can_unlock : Bool;
-  } {
-    switch (vault_entries.get(user)) {
-      case null { null };
-      case (?entry) {
-        let can_unlock = switch (entry.unlock_time) {
-          case null { false };
-          case (?unlock_time) { now() >= unlock_time };
-        };
-        ?{
-          amount = entry.amount;
-          locked_at = entry.locked_at;
-          unlock_time = entry.unlock_time;
-          can_unlock = can_unlock;
-        };
+    is_flexible : Bool;
+  }] {
+    switch (user_vault_entries.get(user)) {
+      case null { [] };
+      case (?entry_ids) {
+        Array.mapFilter<Nat, { id : Nat; amount : Nat; locked_at : Nat64; unlock_time : ?Nat64; can_unlock : Bool; is_flexible : Bool }>(
+          entry_ids,
+          func(entry_id) {
+            switch (vault_entries.get(entry_id)) {
+              case null { null };
+              case (?entry) {
+                let can_unlock = if (entry.is_flexible) {
+                  true;
+                } else {
+                  switch (entry.unlock_time) {
+                    case null { false };
+                    case (?unlock_time) { now() >= unlock_time };
+                  };
+                };
+                ?{
+                  id = entry.id;
+                  amount = entry.amount;
+                  locked_at = entry.locked_at;
+                  unlock_time = entry.unlock_time;
+                  can_unlock = can_unlock;
+                  is_flexible = entry.is_flexible;
+                };
+              };
+            };
+          },
+        );
       };
     };
   };
 
   public query func get_unclaimed_dividends(user : Principal) : async [(Nat, Nat)] {
-    switch (vault_entries.get(user)) {
+    switch (user_vault_entries.get(user)) {
       case null { [] };
-      case (?entry) {
-        let unclaimed = Array.mapFilter<(Nat, Types.DividendDistribution), (Nat, Nat)>(
-          Iter.toArray(dividend_history.entries()),
-          func((id, distribution)) : ?(Nat, Nat) {
-            let claim_key = (user, id);
-            let already_claimed = Option.get(user_dividend_claims.get(claim_key), false);
-            let eligible = entry.locked_at <= distribution.distributed_at;
+      case (?entry_ids) {
+        // Calculate total unclaimed dividends across all user's vault entries
+        var total_unclaimed : [(Nat, Nat)] = [];
 
-            if (not already_claimed and eligible) {
-              let dividend_amount_float = Float.fromInt(entry.amount) * distribution.per_token_amount;
-              let dividend_amount = Int.abs(Float.toInt(dividend_amount_float));
-              ?(id, dividend_amount);
-            } else {
-              null;
+        for (entry_id in entry_ids.vals()) {
+          switch (vault_entries.get(entry_id)) {
+            case null {};
+            case (?entry) {
+              let entry_unclaimed = Array.mapFilter<(Nat, Types.DividendDistribution), (Nat, Nat)>(
+                Iter.toArray(dividend_history.entries()),
+                func((dist_id, distribution)) : ?(Nat, Nat) {
+                  let claim_key = (user, dist_id);
+                  let already_claimed = Option.get(user_dividend_claims.get(claim_key), false);
+                  let eligible = entry.locked_at <= distribution.distributed_at;
+
+                  if (not already_claimed and eligible) {
+                    let dividend_amount_float = Float.fromInt(entry.amount) * distribution.per_token_amount;
+                    let dividend_amount = Int.abs(Float.toInt(dividend_amount_float));
+                    ?(dist_id, dividend_amount);
+                  } else {
+                    null;
+                  };
+                },
+              );
+
+              // Merge with total (sum amounts for same distribution IDs)
+              for ((dist_id, amount) in entry_unclaimed.vals()) {
+                let existing_index = Array.indexOf<(Nat, Nat)>((dist_id, amount), total_unclaimed, func(a, b) { a.0 == b.0 });
+                switch (existing_index) {
+                  case null {
+                    total_unclaimed := Array.append(total_unclaimed, [(dist_id, amount)]);
+                  };
+                  case (?index) {
+                    // Sum the amounts for the same distribution ID
+                    let updated = Array.mapEntries<(Nat, Nat), (Nat, Nat)>(
+                      total_unclaimed,
+                      func(item, i) {
+                        if (i == index) { (item.0, item.1 + amount) } else {
+                          item;
+                        };
+                      },
+                    );
+                    total_unclaimed := updated;
+                  };
+                };
+              };
             };
-          },
-        );
-        unclaimed;
+          };
+        };
+
+        total_unclaimed;
       };
     };
   };

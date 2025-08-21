@@ -9,10 +9,12 @@ const AdminPanel = ({ onRefresh }) => {
   const [transferTo, setTransferTo] = useState('');
   const [dividendAmount, setDividendAmount] = useState('');
   const [lockPeriod, setLockPeriod] = useState('');
+  const [emergencyEntryId, setEmergencyEntryId] = useState('');
   const [loading, setLoading] = useState({
     transfer: false,
     dividend: false,
     lockPeriod: false,
+    emergency: false,
   });
 
   const handleTransferTokens = async (e) => {
@@ -105,6 +107,41 @@ const AdminPanel = ({ onRefresh }) => {
       toast.error('Failed to set lock period');
     } finally {
       setLoading(prev => ({ ...prev, lockPeriod: false }));
+    }
+  };
+
+  const handleEmergencyWithdrawal = async (e) => {
+    e.preventDefault();
+    
+    if (!emergencyEntryId || Number(emergencyEntryId) <= 0) {
+      toast.error('Please enter a valid entry ID');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to perform emergency withdrawal for entry #${emergencyEntryId}? This will immediately unlock the tokens and return them to the user.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setLoading(prev => ({ ...prev, emergency: true }));
+      const entryId = Number(emergencyEntryId);
+      const result = await actor.admin_emergency_withdrawal(entryId);
+      
+      if ('ok' in result) {
+        const withdrawnAmount = Number(result.ok) / 1000000;
+        toast.success(`Emergency withdrawal successful! Returned ${withdrawnAmount.toFixed(2)} USDX from entry #${entryId}`);
+        setEmergencyEntryId('');
+        onRefresh();
+      } else {
+        toast.error(result.err);
+      }
+    } catch (error) {
+      console.error('Failed to perform emergency withdrawal:', error);
+      toast.error('Failed to perform emergency withdrawal');
+    } finally {
+      setLoading(prev => ({ ...prev, emergency: false }));
     }
   };
 
@@ -234,6 +271,41 @@ const AdminPanel = ({ onRefresh }) => {
           </div>
         </div>
 
+        {/* Emergency Withdrawal Section */}
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-red-800 mb-4">Emergency Withdrawal</h3>
+          <form onSubmit={handleEmergencyWithdrawal} className="space-y-4">
+            <div>
+              <label htmlFor="emergencyEntryId" className="block text-sm font-medium text-gray-700 mb-2">
+                Vault Entry ID
+              </label>
+              <input
+                type="number"
+                id="emergencyEntryId"
+                value={emergencyEntryId}
+                onChange={(e) => setEmergencyEntryId(e.target.value)}
+                placeholder="Enter vault entry ID to unlock (e.g., 1, 2, 3)"
+                min="1"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                required
+              />
+            </div>
+            
+            <button
+              type="submit"
+              disabled={loading.emergency}
+              className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white py-2 px-4 rounded-lg font-medium transition-colors"
+            >
+              {loading.emergency ? 'Processing...' : 'Emergency Withdraw'}
+            </button>
+          </form>
+          
+          <div className="mt-3 text-sm text-red-700">
+            <p>⚠️ This will immediately unlock any vault entry and return tokens to the user</p>
+            <p className="text-xs mt-1">Use only in emergency situations. This action cannot be undone.</p>
+          </div>
+        </div>
+
         {/* Admin Info */}
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex items-start space-x-3">
@@ -248,6 +320,7 @@ const AdminPanel = ({ onRefresh }) => {
                 <li>• Transfer USDX tokens to any address</li>
                 <li>• Distribute dividends to vault participants</li>
                 <li>• Set default lock period for vault operations</li>
+                <li>• Perform emergency withdrawals for any vault entry</li>
                 <li>• All operations use your admin token balance</li>
               </ul>
             </div>

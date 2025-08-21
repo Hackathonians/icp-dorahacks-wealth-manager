@@ -106,10 +106,12 @@ module {
 
   // Vault Types
   public type VaultEntry = {
+    id : Nat; // Unique ID for each staking entry
     owner : Principal;
     amount : Tokens;
     locked_at : Timestamp;
-    unlock_time : ?Timestamp;
+    unlock_time : ?Timestamp; // null means flexible staking (can withdraw anytime)
+    is_flexible : Bool; // true for flexible staking, false for time-locked
   };
 
   public type DividendDistribution = {

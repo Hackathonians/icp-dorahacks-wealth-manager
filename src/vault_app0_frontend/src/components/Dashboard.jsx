@@ -18,7 +18,7 @@ import {
 const Dashboard = () => {
   const { isAuthenticated, actor, principal } = useAuth();
   const [vaultInfo, setVaultInfo] = useState(null);
-  const [userVaultInfo, setUserVaultInfo] = useState(null);
+  const [userVaultEntries, setUserVaultEntries] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -42,10 +42,10 @@ const Dashboard = () => {
       // Check if user is admin
       setIsAdmin(vaultInfoResult.admin.toString() === principal.toString());
       
-      // Load user vault info
-      const userVaultResult = await actor.get_user_vault_info(principal);
+      // Load user vault entries
+      const userVaultResult = await actor.get_user_vault_entries(principal);
       console.log('userVaultResult', userVaultResult);
-      setUserVaultInfo(userVaultResult[0] || null);
+      setUserVaultEntries(userVaultResult || []);
       
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -162,7 +162,7 @@ const Dashboard = () => {
         <div className="space-y-6">
           <TokenBalance onRefresh={refreshData} />
           <VaultSection 
-            userVaultInfo={userVaultInfo} 
+            userVaultEntries={userVaultEntries} 
             onRefresh={refreshData} 
           />
         </div>
