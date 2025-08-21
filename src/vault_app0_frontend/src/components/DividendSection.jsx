@@ -145,7 +145,7 @@ const DividendSection = ({ onRefresh }) => {
                     <div>
                       <span className="text-gray-600">Per Token:</span>
                       <p className="font-semibold">
-                        {formatTokenAmount(distribution.per_token_amount)} USDX
+                        {distribution.per_token_amount.toFixed(6)} USDX
                       </p>
                     </div>
                   </div>

@@ -114,7 +114,7 @@ module {
 
   public type DividendDistribution = {
     total_amount : Tokens;
-    per_token_amount : Tokens;
+    per_token_amount : Float;
     distributed_at : Timestamp;
     distribution_id : Nat;
     total_locked_at_distribution : Tokens;

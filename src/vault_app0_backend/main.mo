@@ -10,6 +10,7 @@ import Nat "mo:base/Nat";
 import Nat64 "mo:base/Nat64";
 import Nat32 "mo:base/Nat32";
 import Nat8 "mo:base/Nat8";
+import Float "mo:base/Float";
 import Types "./types";
 
 persistent actor VaultApp {
@@ -369,13 +370,16 @@ persistent actor VaultApp {
     dividend_counter += 1;
 
     // Store the total dividend amount and total locked at distribution time
-    // This avoids precision loss from integer division
+    // Calculate per_token_amount using Float for precision
+    let _per_token_amount = Float.fromInt(total_dividend_amount) / Float.fromInt(vault_total_locked);
+    let total_locked_at_distribution = vault_total_locked;
+
     let distribution : Types.DividendDistribution = {
       total_amount = total_dividend_amount;
-      per_token_amount = 0; // Will be calculated during claim
+      per_token_amount = _per_token_amount;
       distributed_at = now();
       distribution_id = dividend_counter;
-      total_locked_at_distribution = vault_total_locked;
+      total_locked_at_distribution = total_locked_at_distribution;
     };
 
     dividend_history.put(dividend_counter, distribution);
@@ -407,9 +411,10 @@ persistent actor VaultApp {
                   return #err("Tokens were locked after this dividend distribution");
                 };
 
-                // Calculate dividend amount: (user_locked_amount * total_dividend) / total_locked_at_distribution
-                // This ensures fair distribution based on the locked amounts at distribution time
-                let dividend_amount = (entry.amount * distribution.total_amount) / distribution.total_locked_at_distribution;
+                // Calculate dividend amount using Float precision: user_locked_amount * per_token_amount
+                // This ensures fair distribution with proper decimal precision
+                let dividend_amount_float = Float.fromInt(entry.amount) * distribution.per_token_amount;
+                let dividend_amount = Int.abs(Float.toInt(dividend_amount_float));
 
                 let admin_balance = getBalance(admin_account);
                 setBalance(admin_account, admin_balance - dividend_amount);
@@ -479,7 +484,8 @@ persistent actor VaultApp {
             let eligible = entry.locked_at <= distribution.distributed_at;
 
             if (not already_claimed and eligible) {
-              let dividend_amount = (entry.amount * distribution.total_amount) / distribution.total_locked_at_distribution;
+              let dividend_amount_float = Float.fromInt(entry.amount) * distribution.per_token_amount;
+              let dividend_amount = Int.abs(Float.toInt(dividend_amount_float));
               ?(id, dividend_amount);
             } else {
               null;
