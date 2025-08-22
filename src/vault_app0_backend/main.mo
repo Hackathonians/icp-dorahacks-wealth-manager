@@ -13,9 +13,14 @@ import Nat8 "mo:base/Nat8";
 import Float "mo:base/Float";
 import Types "./types";
 
-persistent actor VaultApp {
-  // Admin principal (replace with actual admin principal)
-  private let admin : Principal = Principal.fromText("xygmt-g36ra-6fx4l-vrohf-fhtid-h7jba-gbumz-34aii-c2j73-vh53b-mqe");
+persistent actor class VaultApp(init_admin: ?Principal) {
+  
+  // Admin principal from init argument or fallback
+  private let admin : Principal = switch(init_admin) {
+    case (?admin_principal) { admin_principal };
+    // Admin principal (replace with actual admin principal)
+    case null { Principal.fromText("xygmt-g36ra-6fx4l-vrohf-fhtid-h7jba-gbumz-34aii-c2j73-vh53b-mqe") };
+  };
 
   // Token state
   private let token_name = "USDX Mock Token";
