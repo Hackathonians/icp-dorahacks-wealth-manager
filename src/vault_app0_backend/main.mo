@@ -14,8 +14,14 @@ import Float "mo:base/Float";
 import Types "./types";
 
 persistent actor VaultApp {
-  // Admin principal (replace with actual admin principal)
-  private let admin : Principal = Principal.fromText("xygmt-g36ra-6fx4l-vrohf-fhtid-h7jba-gbumz-34aii-c2j73-vh53b-mqe");
+  // Admin principals - multiple admins supported
+  private let admins : [Principal] = [
+    Principal.fromText("xygmt-g36ra-6fx4l-vrohf-fhtid-h7jba-gbumz-34aii-c2j73-vh53b-mqe"), // Original admin
+    Principal.fromText("ddm5i-napuo-a6jjo-czjha-xcr4l-dzpqe-uygc7-w3yxz-dmqso-zd36q-eae") // New admin
+  ];
+
+  // Primary admin for backward compatibility (first admin in the list)
+  private let admin : Principal = admins[0];
 
   // Token state
   private let token_name = "USDX Mock Token";
@@ -30,6 +36,9 @@ persistent actor VaultApp {
   private var vault_total_locked : Nat = 0;
   private var dividend_counter : Nat = 0;
   private var vault_entry_counter : Nat = 0; // Counter for unique vault entry IDs
+
+  // Product state
+  private var product_counter : Nat = 0; // Counter for unique product IDs
 
   // Helper functions
   private func accountEqual(a1 : Types.Account, a2 : Types.Account) : Bool {
@@ -83,12 +92,15 @@ persistent actor VaultApp {
   };
 
   private func isAdmin(caller : Principal) : Bool {
-    Principal.equal(caller, admin);
+    Array.find<Principal>(admins, func(adminPrincipal) { Principal.equal(caller, adminPrincipal) }) != null;
   };
 
   // Token balances and allowances
   private transient var balances = HashMap.HashMap<Types.Account, Nat>(10, accountEqual, accountHash);
   private transient var allowances = HashMap.HashMap<(Types.Account, Types.Account), Types.Allowance>(10, allowanceKeyEqual, allowanceKeyHash);
+
+  // Product storage
+  private transient var products = HashMap.HashMap<Nat, Types.Product>(10, Nat.equal, func(n : Nat) : Nat32 { Nat32.fromNat(n % (2 ** 32 - 1)) });
 
   // Vault state - changed to support multiple entries per user
   private transient var vault_entries = HashMap.HashMap<Nat, Types.VaultEntry>(10, Nat.equal, func(n : Nat) : Nat32 { Nat32.fromNat(n % (2 ** 32 - 1)) });
@@ -110,6 +122,36 @@ persistent actor VaultApp {
     subaccount = null;
   };
   private transient let _ = balances.put(admin_account, token_total_supply);
+
+  // Initialize default products
+  private func initializeDefaultProducts() {
+    // Product A - Flexible and short-term options
+    product_counter += 1;
+    let product_a : Types.Product = {
+      id = product_counter;
+      name = "Flexible Savings";
+      description = "Flexible savings product with multiple duration options including instant withdrawal";
+      available_durations = [#Flexible, #Minutes(60), #Minutes(1440), #Minutes(43200)]; // Flexible, 1 hour, 1 day, 1 month
+      is_active = true;
+      created_at = now();
+    };
+    products.put(product_counter, product_a);
+
+    // Product B - Short-term high frequency
+    product_counter += 1;
+    let product_b : Types.Product = {
+      id = product_counter;
+      name = "Quick Staking";
+      description = "Short-term staking product for active traders";
+      available_durations = [#Minutes(15), #Minutes(60), #Minutes(10080)]; // 15 minutes, 1 hour, 1 week
+      is_active = true;
+      created_at = now();
+    };
+    products.put(product_counter, product_b);
+  };
+
+  // Initialize products on deployment
+  private transient let _ = initializeDefaultProducts();
 
   // =============================================================================
   // TOKEN FUNCTIONS (ICRC-1/2)
@@ -321,8 +363,101 @@ persistent actor VaultApp {
     };
   };
 
+  // Product management functions
+  public shared (msg) func admin_create_product(name : Text, description : Text, available_durations : [Types.LockDuration]) : async Result.Result<Nat, Text> {
+    let caller = msg.caller;
+    if (not isAdmin(caller)) {
+      return #err("Only admin can create products");
+    };
+
+    if (name == "") {
+      return #err("Product name cannot be empty");
+    };
+
+    if (available_durations.size() == 0) {
+      return #err("Product must have at least one available duration");
+    };
+
+    product_counter += 1;
+    let product_id = product_counter;
+
+    let product : Types.Product = {
+      id = product_id;
+      name = name;
+      description = description;
+      available_durations = available_durations;
+      is_active = true;
+      created_at = now();
+    };
+
+    products.put(product_id, product);
+
+    #ok(product_id);
+  };
+
+  public shared (msg) func admin_update_product(product_id : Nat, name : ?Text, description : ?Text, available_durations : ?[Types.LockDuration], is_active : ?Bool) : async Result.Result<(), Text> {
+    let caller = msg.caller;
+    if (not isAdmin(caller)) {
+      return #err("Only admin can update products");
+    };
+
+    switch (products.get(product_id)) {
+      case null {
+        #err("Product not found");
+      };
+      case (?existing_product) {
+        let updated_product : Types.Product = {
+          id = existing_product.id;
+          name = Option.get(name, existing_product.name);
+          description = Option.get(description, existing_product.description);
+          available_durations = Option.get(available_durations, existing_product.available_durations);
+          is_active = Option.get(is_active, existing_product.is_active);
+          created_at = existing_product.created_at;
+        };
+
+        // Validate updated product
+        if (updated_product.name == "") {
+          return #err("Product name cannot be empty");
+        };
+
+        if (updated_product.available_durations.size() == 0) {
+          return #err("Product must have at least one available duration");
+        };
+
+        products.put(product_id, updated_product);
+        #ok(());
+      };
+    };
+  };
+
+  public shared (msg) func admin_delete_product(product_id : Nat) : async Result.Result<(), Text> {
+    let caller = msg.caller;
+    if (not isAdmin(caller)) {
+      return #err("Only admin can delete products");
+    };
+
+    switch (products.get(product_id)) {
+      case null {
+        #err("Product not found");
+      };
+      case (?_) {
+        products.delete(product_id);
+        #ok(());
+      };
+    };
+  };
+
+  // Admin management functions
+  public query func get_admins() : async [Principal] {
+    admins;
+  };
+
+  public query func is_admin(principal : Principal) : async Bool {
+    isAdmin(principal);
+  };
+
   // Vault functions
-  public shared (msg) func vault_lock_tokens(amount : Nat, lock_duration_minutes : ?Nat, is_flexible : ?Bool) : async Result.Result<Nat, Text> {
+  public shared (msg) func vault_lock_tokens(amount : Nat, product_id : Nat, selected_duration : Types.LockDuration) : async Result.Result<Nat, Text> {
     let caller = msg.caller;
     let caller_account : Types.Account = { owner = caller; subaccount = null };
 
@@ -331,49 +466,80 @@ persistent actor VaultApp {
       return #err("Insufficient balance to lock");
     };
 
-    setBalance(caller_account, user_balance - amount);
-    let admin_balance = getBalance(admin_account);
-    setBalance(admin_account, admin_balance + amount);
-
-    // Generate unique entry ID
-    vault_entry_counter += 1;
-    let entry_id = vault_entry_counter;
-
-    // Determine if this is flexible staking
-    let flexible_staking = Option.get(is_flexible, false);
-
-    // Calculate unlock time based on staking type
-    let unlock_time = if (flexible_staking) {
-      null // Flexible staking - can withdraw anytime
-    } else {
-      // Time-locked staking
-      let lock_duration_nanoseconds = switch (lock_duration_minutes) {
-        case (?minutes) { Nat64.fromNat(minutes * 60 * 1000000000) }; // Convert minutes to nanoseconds
-        case null { vault_lock_period_nanoseconds }; // Use default
+    // Validate product exists and is active
+    switch (products.get(product_id)) {
+      case null {
+        return #err("Product not found");
       };
-      ?(now() + lock_duration_nanoseconds);
+      case (?product) {
+        if (not product.is_active) {
+          return #err("Product is not active");
+        };
+
+        // Validate that the selected duration is available for this product
+        let duration_available = Array.find<Types.LockDuration>(
+          product.available_durations,
+          func(duration) {
+            switch (duration, selected_duration) {
+              case (#Flexible, #Flexible) { true };
+              case (#Minutes(a), #Minutes(b)) { a == b };
+              case _ { false };
+            };
+          },
+        );
+
+        switch (duration_available) {
+          case null {
+            return #err("Selected duration is not available for this product");
+          };
+          case (?_) {
+            // Duration is valid, proceed with locking
+          };
+        };
+
+        setBalance(caller_account, user_balance - amount);
+        let admin_balance = getBalance(admin_account);
+        setBalance(admin_account, admin_balance + amount);
+
+        // Generate unique entry ID
+        vault_entry_counter += 1;
+        let entry_id = vault_entry_counter;
+
+        // Calculate unlock time based on selected duration
+        let (unlock_time, is_flexible) = switch (selected_duration) {
+          case (#Flexible) {
+            (null, true); // Flexible staking - can withdraw anytime
+          };
+          case (#Minutes(minutes)) {
+            let lock_duration_nanoseconds = Nat64.fromNat(minutes * 60 * 1000000000); // Convert minutes to nanoseconds
+            (?(now() + lock_duration_nanoseconds), false);
+          };
+        };
+
+        let entry : Types.VaultEntry = {
+          id = entry_id;
+          owner = caller;
+          amount = amount;
+          locked_at = now();
+          unlock_time = unlock_time;
+          is_flexible = is_flexible;
+          product_id = product_id;
+          selected_duration = selected_duration;
+        };
+
+        // Store the entry
+        vault_entries.put(entry_id, entry);
+
+        // Update user's entry list
+        let current_entries = Option.get(user_vault_entries.get(caller), []);
+        let updated_entries = Array.append(current_entries, [entry_id]);
+        user_vault_entries.put(caller, updated_entries);
+
+        vault_total_locked += amount;
+
+        #ok(entry_id);
+      };
     };
-
-    let entry : Types.VaultEntry = {
-      id = entry_id;
-      owner = caller;
-      amount = amount;
-      locked_at = now();
-      unlock_time = unlock_time;
-      is_flexible = flexible_staking;
-    };
-
-    // Store the entry
-    vault_entries.put(entry_id, entry);
-
-    // Update user's entry list
-    let current_entries = Option.get(user_vault_entries.get(caller), []);
-    let updated_entries = Array.append(current_entries, [entry_id]);
-    user_vault_entries.put(caller, updated_entries);
-
-    vault_total_locked += amount;
-
-    #ok(entry_id);
   };
 
   public shared (msg) func vault_unlock_tokens(entry_id : Nat) : async Result.Result<Nat, Text> {
@@ -530,19 +696,43 @@ persistent actor VaultApp {
   };
 
   // Query functions
+  public query func get_all_products() : async [Types.Product] {
+    Iter.toArray(Iter.map(products.vals(), func(product : Types.Product) : Types.Product { product }));
+  };
+
+  public query func get_active_products() : async [Types.Product] {
+    Array.filter<Types.Product>(
+      Iter.toArray(products.vals()),
+      func(product) { product.is_active },
+    );
+  };
+
+  public query func get_product(product_id : Nat) : async ?Types.Product {
+    products.get(product_id);
+  };
+
   public query func get_vault_info() : async {
     total_locked : Nat;
     lock_period_seconds : Nat64;
     lock_period_minutes : Nat64;
     dividend_count : Nat;
     admin : Principal;
+    admins : [Principal];
+    total_products : Nat;
+    active_products : Nat;
   } {
+    let all_products = Iter.toArray(products.vals());
+    let active_products_count = Array.filter<Types.Product>(all_products, func(product) { product.is_active }).size();
+
     {
       total_locked = vault_total_locked;
       lock_period_seconds = vault_lock_period_nanoseconds / 1000000000; // Convert nanoseconds to seconds
       lock_period_minutes = vault_lock_period_nanoseconds / 60000000000; // Convert nanoseconds to minutes
       dividend_count = dividend_counter;
-      admin = admin;
+      admin = admin; // Primary admin for backward compatibility
+      admins = admins; // All admins
+      total_products = all_products.size();
+      active_products = active_products_count;
     };
   };
 
@@ -553,11 +743,13 @@ persistent actor VaultApp {
     unlock_time : ?Nat64;
     can_unlock : Bool;
     is_flexible : Bool;
+    product_id : Nat;
+    selected_duration : Types.LockDuration;
   }] {
     switch (user_vault_entries.get(user)) {
       case null { [] };
       case (?entry_ids) {
-        Array.mapFilter<Nat, { id : Nat; amount : Nat; locked_at : Nat64; unlock_time : ?Nat64; can_unlock : Bool; is_flexible : Bool }>(
+        Array.mapFilter<Nat, { id : Nat; amount : Nat; locked_at : Nat64; unlock_time : ?Nat64; can_unlock : Bool; is_flexible : Bool; product_id : Nat; selected_duration : Types.LockDuration }>(
           entry_ids,
           func(entry_id) {
             switch (vault_entries.get(entry_id)) {
@@ -578,6 +770,8 @@ persistent actor VaultApp {
                   unlock_time = entry.unlock_time;
                   can_unlock = can_unlock;
                   is_flexible = entry.is_flexible;
+                  product_id = entry.product_id;
+                  selected_duration = entry.selected_duration;
                 };
               };
             };
