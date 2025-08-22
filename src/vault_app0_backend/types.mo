@@ -104,6 +104,21 @@ module {
     spender : Account;
   };
 
+  // Product Types
+  public type LockDuration = {
+    #Flexible; // Can withdraw anytime
+    #Minutes : Nat; // Lock for specified minutes
+  };
+
+  public type Product = {
+    id : Nat;
+    name : Text;
+    description : Text;
+    available_durations : [LockDuration];
+    is_active : Bool;
+    created_at : Timestamp;
+  };
+
   // Vault Types
   public type VaultEntry = {
     id : Nat; // Unique ID for each staking entry
@@ -112,6 +127,8 @@ module {
     locked_at : Timestamp;
     unlock_time : ?Timestamp; // null means flexible staking (can withdraw anytime)
     is_flexible : Bool; // true for flexible staking, false for time-locked
+    product_id : Nat; // Reference to the product used
+    selected_duration : LockDuration; // The duration selected by user
   };
 
   public type DividendDistribution = {

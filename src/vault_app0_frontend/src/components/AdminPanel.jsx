@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Principal } from '@dfinity/principal';
 import toast from 'react-hot-toast';
+import { formatDuration } from '../utils/utils';
 
 const AdminPanel = ({ onRefresh }) => {
   const { actor } = useAuth();
@@ -10,12 +11,55 @@ const AdminPanel = ({ onRefresh }) => {
   const [dividendAmount, setDividendAmount] = useState('');
   const [lockPeriod, setLockPeriod] = useState('');
   const [emergencyEntryId, setEmergencyEntryId] = useState('');
+  
+  // Product management state
+  const [products, setProducts] = useState([]);
+  const [productName, setProductName] = useState('');
+  const [productDescription, setProductDescription] = useState('');
+  const [selectedDurations, setSelectedDurations] = useState([]);
+  const [customDuration, setCustomDuration] = useState('');
+  
+  // Admin management state
+  const [adminList, setAdminList] = useState([]);
+  
   const [loading, setLoading] = useState({
     transfer: false,
     dividend: false,
     lockPeriod: false,
     emergency: false,
+    products: false,
+    createProduct: false,
   });
+
+  useEffect(() => {
+    if (actor) {
+      loadProducts();
+      loadAdmins();
+    }
+  }, [actor]);
+
+  const loadProducts = async () => {
+    try {
+      setLoading(prev => ({ ...prev, products: true }));
+      const allProducts = await actor.get_all_products();
+      setProducts(allProducts || []);
+    } catch (error) {
+      console.error('Failed to load products:', error);
+      toast.error('Failed to load products');
+    } finally {
+      setLoading(prev => ({ ...prev, products: false }));
+    }
+  };
+
+  const loadAdmins = async () => {
+    try {
+      const admins = await actor.get_admins();
+      setAdminList(admins || []);
+    } catch (error) {
+      console.error('Failed to load admins:', error);
+      // Don't show error toast for this as it's not critical
+    }
+  };
 
   const handleTransferTokens = async (e) => {
     e.preventDefault();
@@ -30,7 +74,7 @@ const AdminPanel = ({ onRefresh }) => {
       const toPrincipal = Principal.fromText(transferTo);
       
       setLoading(prev => ({ ...prev, transfer: true }));
-      const amount = Math.floor(Number(transferAmount) * 1000000); // Convert to smallest unit
+      const amount = BigInt(Math.floor(Number(transferAmount) * 1000000)); // Convert to smallest unit
       const result = await actor.admin_transfer_tokens(toPrincipal, amount);
       
       if ('ok' in result) {
@@ -63,7 +107,7 @@ const AdminPanel = ({ onRefresh }) => {
 
     try {
       setLoading(prev => ({ ...prev, dividend: true }));
-      const amount = Math.floor(Number(dividendAmount) * 1000000); // Convert to smallest unit
+      const amount = BigInt(Math.floor(Number(dividendAmount) * 1000000)); // Convert to smallest unit
       const result = await actor.admin_distribute_dividend(amount);
       
       if ('ok' in result) {
@@ -92,7 +136,7 @@ const AdminPanel = ({ onRefresh }) => {
 
     try {
       setLoading(prev => ({ ...prev, lockPeriod: true }));
-      const periodMinutes = Number(lockPeriod);
+      const periodMinutes = BigInt(lockPeriod);
       const result = await actor.admin_set_lock_period(periodMinutes);
       
       if ('ok' in result) {
@@ -126,7 +170,7 @@ const AdminPanel = ({ onRefresh }) => {
 
     try {
       setLoading(prev => ({ ...prev, emergency: true }));
-      const entryId = Number(emergencyEntryId);
+      const entryId = BigInt(emergencyEntryId);
       const result = await actor.admin_emergency_withdrawal(entryId);
       
       if ('ok' in result) {
@@ -143,6 +187,123 @@ const AdminPanel = ({ onRefresh }) => {
     } finally {
       setLoading(prev => ({ ...prev, emergency: false }));
     }
+  };
+
+  const handleCreateProduct = async (e) => {
+    e.preventDefault();
+    
+    if (!productName || !productDescription) {
+      toast.error('Please fill in product name and description');
+      return;
+    }
+
+    if (selectedDurations.length === 0) {
+      toast.error('Please select at least one duration option');
+      return;
+    }
+
+    try {
+      setLoading(prev => ({ ...prev, createProduct: true }));
+      
+      // Convert duration selections to the format expected by the backend
+      const durations = selectedDurations.map(duration => {
+        if (duration === 'flexible') {
+          return { Flexible: null };
+        } else {
+          return { Minutes: parseInt(duration) };
+        }
+      });
+
+      const result = await actor.admin_create_product(productName, productDescription, durations);
+      
+      if ('ok' in result) {
+        const productId = Number(result.ok);
+        toast.success(`Product created successfully! Product ID: ${productId}`);
+        setProductName('');
+        setProductDescription('');
+        setSelectedDurations([]);
+        setCustomDuration('');
+        loadProducts();
+        onRefresh();
+      } else {
+        toast.error(result.err);
+      }
+    } catch (error) {
+      console.error('Failed to create product:', error);
+      toast.error('Failed to create product');
+    } finally {
+      setLoading(prev => ({ ...prev, createProduct: false }));
+    }
+  };
+
+  const handleToggleProductStatus = async (productId, currentStatus) => {
+    try {
+      // Convert to BigInt and use proper optional parameter format
+      const result = await actor.admin_update_product(
+        BigInt(productId), 
+        [], // name (empty optional)
+        [], // description (empty optional)
+        [], // available_durations (empty optional)
+        [!currentStatus] // is_active (optional with value)
+      );
+      
+      if ('ok' in result) {
+        toast.success(`Product ${!currentStatus ? 'activated' : 'deactivated'} successfully!`);
+        loadProducts();
+        onRefresh();
+      } else {
+        toast.error(result.err);
+      }
+    } catch (error) {
+      console.error('Failed to update product status:', error);
+      toast.error('Failed to update product status');
+    }
+  };
+
+  const handleDeleteProduct = async (productId) => {
+    const confirmed = window.confirm('Are you sure you want to delete this product? This action cannot be undone.');
+    
+    if (!confirmed) return;
+
+    try {
+      // Convert to BigInt
+      const result = await actor.admin_delete_product(BigInt(productId));
+      
+      if ('ok' in result) {
+        toast.success('Product deleted successfully!');
+        loadProducts();
+        onRefresh();
+      } else {
+        toast.error(result.err);
+      }
+    } catch (error) {
+      console.error('Failed to delete product:', error);
+      toast.error('Failed to delete product');
+    }
+  };
+
+
+  const handleDurationToggle = (duration) => {
+    setSelectedDurations(prev => {
+      if (prev.includes(duration)) {
+        return prev.filter(d => d !== duration);
+      } else {
+        return [...prev, duration];
+      }
+    });
+  };
+
+  const addCustomDuration = () => {
+    if (!customDuration || isNaN(customDuration) || Number(customDuration) <= 0) {
+      toast.error('Please enter a valid duration in minutes');
+      return;
+    }
+    
+    const duration = customDuration;
+    if (!selectedDurations.includes(duration)) {
+      setSelectedDurations(prev => [...prev, duration]);
+    }
+    setCustomDuration('');
   };
 
   return (
@@ -306,6 +467,221 @@ const AdminPanel = ({ onRefresh }) => {
           </div>
         </div>
 
+        {/* Product Management Section */}
+        <div className="bg-purple-50 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-purple-800 mb-4">Product Management</h3>
+          
+          {/* Create Product Form */}
+          <form onSubmit={handleCreateProduct} className="space-y-4 mb-6">
+            <div>
+              <label htmlFor="productName" className="block text-sm font-medium text-gray-700 mb-2">
+                Product Name
+              </label>
+              <input
+                type="text"
+                id="productName"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                placeholder="Enter product name (e.g., Premium Staking)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                required
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="productDescription" className="block text-sm font-medium text-gray-700 mb-2">
+                Product Description
+              </label>
+              <textarea
+                id="productDescription"
+                value={productDescription}
+                onChange={(e) => setProductDescription(e.target.value)}
+                placeholder="Enter product description"
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Available Durations
+              </label>
+              
+              {/* Preset Duration Options */}
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {['flexible', '15', '60', '1440', '10080', '43200'].map((duration) => (
+                  <label key={duration} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedDurations.includes(duration)}
+                      onChange={() => handleDurationToggle(duration)}
+                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">
+                      {duration === 'flexible' ? 'Flexible' : 
+                       duration === '15' ? '15 minutes' :
+                       duration === '60' ? '1 hour' :
+                       duration === '1440' ? '1 day' :
+                       duration === '10080' ? '1 week' :
+                       duration === '43200' ? '1 month' : duration}
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              {/* Custom Duration Input */}
+              <div className="flex space-x-2">
+                <input
+                  type="number"
+                  value={customDuration}
+                  onChange={(e) => setCustomDuration(e.target.value)}
+                  placeholder="Custom minutes"
+                  min="1"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                />
+                <button
+                  type="button"
+                  onClick={addCustomDuration}
+                  className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+
+              {/* Selected Durations Display */}
+              {selectedDurations.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-sm text-gray-600 mb-1">Selected durations:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedDurations.map((duration) => (
+                      <span
+                        key={duration}
+                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
+                      >
+                        {duration === 'flexible' ? 'Flexible' : formatDuration(duration)}
+                        <button
+                          type="button"
+                          onClick={() => handleDurationToggle(duration)}
+                          className="ml-1 text-purple-600 hover:text-purple-800"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <button
+              type="submit"
+              disabled={loading.createProduct}
+              className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white py-2 px-4 rounded-lg font-medium transition-colors"
+            >
+              {loading.createProduct ? 'Creating...' : 'Create Product'}
+            </button>
+          </form>
+
+          {/* Existing Products List */}
+          <div>
+            <h4 className="text-md font-semibold text-purple-800 mb-3">Existing Products</h4>
+            {loading.products ? (
+              <div className="text-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-purple-600 border-t-transparent mx-auto"></div>
+                <p className="text-sm text-gray-600 mt-2">Loading products...</p>
+              </div>
+            ) : products.length === 0 ? (
+              <p className="text-sm text-gray-600 text-center py-4">No products created yet</p>
+            ) : (
+              <div className="space-y-3">
+                {products.map((product) => (
+                  <div key={product.id} className="border border-purple-200 rounded-lg p-3">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h5 className="font-medium text-gray-900">{product.name}</h5>
+                        <p className="text-sm text-gray-600">{product.description}</p>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        product.is_active 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {product.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {product.available_durations.map((duration, index) => (
+                        <span
+                          key={index}
+                          className="inline-block px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded"
+                        >
+                          {formatDuration(duration)}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleToggleProductStatus(product.id, product.is_active)}
+                        className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                          product.is_active
+                            ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                        }`}
+                      >
+                        {product.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(product.id)}
+                        className="px-3 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-medium transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Admin List */}
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-indigo-800 mb-4">System Administrators</h3>
+          {adminList.length > 0 ? (
+            <div className="space-y-2">
+              {adminList.map((admin, index) => (
+                <div key={index} className="flex items-center justify-between bg-white rounded-lg p-3 border border-indigo-100">
+                  <div>
+                    <p className="font-mono text-sm text-gray-800 break-all">
+                      {admin.toString()}
+                    </p>
+                    {index === 0 && (
+                      <span className="inline-block px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full mt-1">
+                        Primary Admin
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center">
+                    <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                    <span className="text-xs text-green-600">Active</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-indigo-600">Loading admin list...</p>
+          )}
+          
+          <div className="mt-4 p-3 bg-indigo-100 rounded-lg">
+            <p className="text-sm text-indigo-700">
+              <strong>Note:</strong> All listed principals have full administrative privileges including product management, token transfers, and emergency operations.
+            </p>
+          </div>
+        </div>
+
         {/* Admin Info */}
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex items-start space-x-3">
@@ -317,6 +693,7 @@ const AdminPanel = ({ onRefresh }) => {
             <div>
               <h4 className="text-sm font-medium text-yellow-800">Admin Privileges</h4>
               <ul className="text-sm text-yellow-700 mt-1 space-y-1">
+                <li>• Create, update, and manage staking products</li>
                 <li>• Transfer USDX tokens to any address</li>
                 <li>• Distribute dividends to vault participants</li>
                 <li>• Set default lock period for vault operations</li>

@@ -12,7 +12,8 @@ import {
   CogIcon,
   ChartBarIcon,
   ClockIcon,
-  GiftIcon
+  GiftIcon,
+  ShoppingBagIcon
 } from '@heroicons/react/24/outline';
 
 const Dashboard = () => {
@@ -39,8 +40,12 @@ const Dashboard = () => {
       console.log('vaultInfoResult.admin', vaultInfoResult.admin.toString());
       setVaultInfo(vaultInfoResult);
       
-      // Check if user is admin
-      setIsAdmin(vaultInfoResult.admin.toString() === principal.toString());
+      // Check if user is admin (check against all admins)
+      const userPrincipalStr = principal.toString();
+      const isUserAdmin = vaultInfoResult.admins ? 
+        vaultInfoResult.admins.some(admin => admin.toString() === userPrincipalStr) :
+        vaultInfoResult.admin.toString() === userPrincipalStr; // Fallback for backward compatibility
+      setIsAdmin(isUserAdmin);
       
       // Load user vault entries
       const userVaultResult = await actor.get_user_vault_entries(principal);
@@ -117,7 +122,7 @@ const Dashboard = () => {
             <ChartBarIcon className="w-6 h-6 mr-2" />
             Vault Overview
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="glass rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <LockClosedIcon className="w-8 h-8 text-blue-400" />
@@ -132,12 +137,24 @@ const Dashboard = () => {
             
             <div className="glass rounded-lg p-4">
               <div className="flex items-center justify-between">
+                <ShoppingBagIcon className="w-8 h-8 text-purple-400" />
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-white">
+                    {vaultInfo.active_products || 0}
+                  </p>
+                  <p className="text-white text-opacity-70 text-sm">Active Products</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="glass rounded-lg p-4">
+              <div className="flex items-center justify-between">
                 <ClockIcon className="w-8 h-8 text-green-400" />
                 <div className="text-right">
                   <p className="text-2xl font-bold text-white">
                     {Number(vaultInfo.lock_period_seconds) / 3600}
                   </p>
-                  <p className="text-white text-opacity-70 text-sm">Hours Lock</p>
+                  <p className="text-white text-opacity-70 text-sm">Default Hours</p>
                 </div>
               </div>
             </div>
