@@ -37,7 +37,7 @@ const DividendSection = ({ onRefresh }) => {
   const handleClaimDividend = async (distributionId) => {
     try {
       setClaimingId(distributionId);
-      const result = await actor.claim_dividend(Number(distributionId));
+      const result = await actor.claim_dividend(BigInt(distributionId));
       
       if ('ok' in result) {
         const claimedAmount = Number(result.ok) / 1000000;
