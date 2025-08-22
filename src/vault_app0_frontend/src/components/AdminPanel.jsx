@@ -208,7 +208,7 @@ const AdminPanel = ({ onRefresh }) => {
       // Convert duration selections to the format expected by the backend
       const durations = selectedDurations.map(duration => {
         if (duration === 'flexible') {
-          return { Flexible: null };
+          return { Minutes: -1 };
         } else {
           return { Minutes: parseInt(duration) };
         }

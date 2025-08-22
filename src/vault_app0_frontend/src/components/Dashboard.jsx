@@ -5,6 +5,8 @@ import TokenBalance from './TokenBalance';
 import VaultSection from './VaultSection';
 import AdminPanel from './AdminPanel';
 import DividendSection from './DividendSection';
+import InvestmentReport from './InvestmentReport';
+import InvestmentInstruments from './InvestmentInstruments';
 import { 
   WalletIcon, 
   LockClosedIcon, 
@@ -13,7 +15,9 @@ import {
   ChartBarIcon,
   ClockIcon,
   GiftIcon,
-  ShoppingBagIcon
+  ShoppingBagIcon,
+  DocumentChartBarIcon,
+  CubeTransparentIcon
 } from '@heroicons/react/24/outline';
 
 const Dashboard = () => {
@@ -22,6 +26,7 @@ const Dashboard = () => {
   const [userVaultEntries, setUserVaultEntries] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   useEffect(() => {
     if (isAuthenticated && actor) {
@@ -115,81 +120,135 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* Vault Overview */}
-      {vaultInfo && (
-        <div className="card">
-          <h2 className="text-xl font-bold text-white mb-4 flex items-center">
-            <ChartBarIcon className="w-6 h-6 mr-2" />
-            Vault Overview
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="glass rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <LockClosedIcon className="w-8 h-8 text-blue-400" />
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-white">
-                    {(Number(vaultInfo.total_locked) / 1000000).toFixed(2)}
-                  </p>
-                  <p className="text-white text-opacity-70 text-sm">USDX Locked</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="glass rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <ShoppingBagIcon className="w-8 h-8 text-purple-400" />
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-white">
-                    {vaultInfo.active_products || 0}
-                  </p>
-                  <p className="text-white text-opacity-70 text-sm">Active Products</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="glass rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <ClockIcon className="w-8 h-8 text-green-400" />
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-white">
-                    {Number(vaultInfo.lock_period_seconds) / 3600}
-                  </p>
-                  <p className="text-white text-opacity-70 text-sm">Default Hours</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="glass rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <GiftIcon className="w-8 h-8 text-yellow-400" />
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-white">
-                    {Number(vaultInfo.dividend_count)}
-                  </p>
-                  <p className="text-white text-opacity-70 text-sm">Dividends</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column */}
-        <div className="space-y-6">
-          <TokenBalance onRefresh={refreshData} />
-          <VaultSection 
-            userVaultEntries={userVaultEntries} 
-            onRefresh={refreshData} 
-          />
-        </div>
-
-        {/* Right Column */}
-        <div className="space-y-6">
-          <DividendSection onRefresh={refreshData} />
-          {isAdmin && <AdminPanel onRefresh={refreshData} />}
+      {/* Navigation Tabs */}
+      <div className="card">
+        <div className="flex space-x-1 bg-white bg-opacity-10 rounded-lg p-1">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`flex items-center px-4 py-2 rounded-md font-medium transition-all ${
+              activeTab === 'dashboard'
+                ? 'bg-white bg-opacity-20 text-white shadow-sm'
+                : 'text-white text-opacity-70 hover:text-white hover:bg-white hover:bg-opacity-10'
+            }`}
+          >
+            <ChartBarIcon className="w-5 h-5 mr-2" />
+            Dashboard
+          </button>
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`flex items-center px-4 py-2 rounded-md font-medium transition-all ${
+              activeTab === 'reports'
+                ? 'bg-white bg-opacity-20 text-white shadow-sm'
+                : 'text-white text-opacity-70 hover:text-white hover:bg-white hover:bg-opacity-10'
+            }`}
+          >
+            <DocumentChartBarIcon className="w-5 h-5 mr-2" />
+            Investment Reports
+          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab('instruments')}
+              className={`flex items-center px-4 py-2 rounded-md font-medium transition-all ${
+                activeTab === 'instruments'
+                  ? 'bg-white bg-opacity-20 text-white shadow-sm'
+                  : 'text-white text-opacity-70 hover:text-white hover:bg-white hover:bg-opacity-10'
+              }`}
+            >
+              <CubeTransparentIcon className="w-5 h-5 mr-2" />
+              Investment Instruments
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Tab Content */}
+      {activeTab === 'dashboard' && (
+        <>
+          {/* Vault Overview */}
+          {vaultInfo && (
+            <div className="card">
+              <h2 className="text-xl font-bold text-white mb-4 flex items-center">
+                <ChartBarIcon className="w-6 h-6 mr-2" />
+                Vault Overview
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="glass rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <LockClosedIcon className="w-8 h-8 text-blue-400" />
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-white">
+                        {(Number(vaultInfo.total_locked) / 1000000).toFixed(2)}
+                      </p>
+                      <p className="text-white text-opacity-70 text-sm">USDX Locked</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="glass rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <ShoppingBagIcon className="w-8 h-8 text-purple-400" />
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-white">
+                        {vaultInfo.active_products || 0}
+                      </p>
+                      <p className="text-white text-opacity-70 text-sm">Active Products</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="glass rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <ClockIcon className="w-8 h-8 text-green-400" />
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-white">
+                        {Number(vaultInfo.lock_period_seconds) / 3600}
+                      </p>
+                      <p className="text-white text-opacity-70 text-sm">Default Hours</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="glass rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <GiftIcon className="w-8 h-8 text-yellow-400" />
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-white">
+                        {Number(vaultInfo.dividend_count)}
+                      </p>
+                      <p className="text-white text-opacity-70 text-sm">Dividends</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column */}
+            <div className="space-y-6">
+              <TokenBalance onRefresh={refreshData} />
+              <VaultSection 
+                userVaultEntries={userVaultEntries} 
+                onRefresh={refreshData} 
+              />
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              <DividendSection onRefresh={refreshData} />
+              {isAdmin && <AdminPanel onRefresh={refreshData} />}
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeTab === 'reports' && (
+        <InvestmentReport />
+      )}
+
+      {activeTab === 'instruments' && isAdmin && (
+        <InvestmentInstruments />
+      )}
     </div>
   );
 };

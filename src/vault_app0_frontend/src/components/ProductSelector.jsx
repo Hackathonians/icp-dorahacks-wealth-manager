@@ -32,35 +32,25 @@ const ProductSelector = ({ onProductSelect, selectedProduct, selectedDuration, o
     }
   };
 
-  
-
-  const getDurationValue = (duration) => {
-    if ('Flexible' in duration) {
-      return 'flexible';
-    }
-    if ('Minutes' in duration) {
-      return duration.Minutes.toString();
-    }
-    return '';
-  };
-
-  const createDurationObject = (durationStr) => {
-    if (durationStr === 'flexible') {
-      return { Flexible: null };
-    }
-    return { Minutes: parseInt(durationStr) };
-  };
-
   const isDurationSelected = (duration) => {
     if (!selectedDuration) return false;
     
-    if ('Flexible' in duration && 'Flexible' in selectedDuration) {
-      return true;
+    // Handle both object format and direct comparison
+    let durationValue, selectedValue;
+    
+    if (typeof duration === 'number') {
+      durationValue = duration;
+    } else if ('Minutes' in duration) {
+      durationValue = duration.Minutes;
     }
-    if ('Minutes' in duration && 'Minutes' in selectedDuration) {
-      return duration.Minutes === selectedDuration.Minutes;
+    
+    if (typeof selectedDuration === 'number') {
+      selectedValue = selectedDuration;
+    } else if ('Minutes' in selectedDuration) {
+      selectedValue = selectedDuration.Minutes;
     }
-    return false;
+    
+    return durationValue === selectedValue;
   };
 
   if (loading) {

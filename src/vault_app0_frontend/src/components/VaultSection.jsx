@@ -37,7 +37,7 @@ const VaultSection = ({ userVaultEntries, onRefresh }) => {
       
       if ('ok' in result) {
         const entryId = Number(result.ok);
-        const durationText = 'Flexible' in selectedDuration ? 'flexible staking' : 
+        const durationText = (selectedDuration.Minutes === -1) ? 'flexible staking' : 
           `time-locked for ${formatDuration(selectedDuration)}`;
         toast.success(`Tokens locked successfully in "${selectedProduct.name}" with ${durationText}! Entry ID: ${entryId}`);
         setLockAmount('');
