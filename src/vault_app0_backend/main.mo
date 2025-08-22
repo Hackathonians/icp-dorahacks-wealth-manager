@@ -99,7 +99,7 @@ persistent actor VaultApp {
   private transient var balances = HashMap.HashMap<Types.Account, Nat>(10, accountEqual, accountHash);
   private transient var allowances = HashMap.HashMap<(Types.Account, Types.Account), Types.Allowance>(10, allowanceKeyEqual, allowanceKeyHash);
 
-  // Product storage
+  // Product storage ...
   private transient var products = HashMap.HashMap<Nat, Types.Product>(10, Nat.equal, func(n : Nat) : Nat32 { Nat32.fromNat(n % (2 ** 32 - 1)) });
 
   // Vault state - changed to support multiple entries per user
