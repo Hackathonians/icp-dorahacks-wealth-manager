@@ -48,11 +48,35 @@ HEADERS = {
 
 # Function definitions for ASI1 function calling
 tools = [
+    # ========== VAULT FUNCTIONS ==========
+    
+    # Token and Balance Functions
     {
         "type": "function",
         "function": {
-            "name": "get_current_fee_percentiles",
-            "description": "Gets the 100 fee percentiles measured in millisatoshi/byte.",
+            "name": "get_user_balance",
+            "description": "Returns the USDX token balance of a user's account.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_principal": {
+                        "type": "string",
+                        "description": "The principal ID of the user to check balance for."
+                    }
+                },
+                "required": ["user_principal"],
+                "additionalProperties": False
+            },
+            "strict": True
+        }
+    },
+    
+    # Vault Information Functions
+    {
+        "type": "function",
+        "function": {
+            "name": "get_vault_info",
+            "description": "Returns general information about the vault including total locked tokens, dividend count, and product information.",
             "parameters": {
                 "type": "object",
                 "properties": {},
@@ -65,69 +89,8 @@ tools = [
     {
         "type": "function",
         "function": {
-            "name": "get_balance",
-            "description": "Returns the balance of a given Bitcoin address.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "address": {
-                        "type": "string",
-                        "description": "The Bitcoin address to check."
-                    }
-                },
-                "required": ["address"],
-                "additionalProperties": False
-            },
-            "strict": True
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_utxos",
-            "description": "Returns the UTXOs of a given Bitcoin address.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "address": {
-                        "type": "string",
-                        "description": "The Bitcoin address to fetch UTXOs for."
-                    }
-                },
-                "required": ["address"],
-                "additionalProperties": False
-            },
-            "strict": True
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "send",
-            "description": "Sends satoshis from this canister to a specified address.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "destinationAddress": {
-                        "type": "string",
-                        "description": "The destination Bitcoin address."
-                    },
-                    "amountInSatoshi": {
-                        "type": "number",
-                        "description": "Amount to send in satoshis."
-                    }
-                },
-                "required": ["destinationAddress", "amountInSatoshi"],
-                "additionalProperties": False
-            },
-            "strict": True
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_p2pkh_address",
-            "description": "Returns the P2PKH address of this canister.",
+            "name": "get_active_products",
+            "description": "Returns all active investment products available for users to invest in.",
             "parameters": {
                 "type": "object",
                 "properties": {},
@@ -140,12 +103,111 @@ tools = [
     {
         "type": "function",
         "function": {
-            "name": "dummy_test",
-            "description": "Runs the dummy test endpoint.",
+            "name": "get_investment_instruments",
+            "description": "Returns all available investment instruments with their details including APY, risk level, and investment limits.",
             "parameters": {
                 "type": "object",
                 "properties": {},
                 "required": [],
+                "additionalProperties": False
+            },
+            "strict": True
+        }
+    },
+    
+    # User Portfolio Functions
+    {
+        "type": "function",
+        "function": {
+            "name": "get_user_vault_entries",
+            "description": "Returns all vault entries (locked investments) for a specific user.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_principal": {
+                        "type": "string",
+                        "description": "The principal ID of the user to get vault entries for."
+                    }
+                },
+                "required": ["user_principal"],
+                "additionalProperties": False
+            },
+            "strict": True
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_user_investment_report",
+            "description": "Returns a comprehensive investment report for a user including total investments, ROI, and dividends.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_principal": {
+                        "type": "string",
+                        "description": "The principal ID of the user to get investment report for."
+                    }
+                },
+                "required": ["user_principal"],
+                "additionalProperties": False
+            },
+            "strict": True
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_unclaimed_dividends",
+            "description": "Returns all unclaimed dividends for a specific user.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_principal": {
+                        "type": "string",
+                        "description": "The principal ID of the user to check unclaimed dividends for."
+                    }
+                },
+                "required": ["user_principal"],
+                "additionalProperties": False
+            },
+            "strict": True
+        }
+    },
+    
+    # Admin Functions (require admin privileges)
+    {
+        "type": "function",
+        "function": {
+            "name": "check_admin_status",
+            "description": "Checks if a user has admin privileges. Required before using admin functions.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_principal": {
+                        "type": "string",
+                        "description": "The principal ID to check for admin privileges."
+                    }
+                },
+                "required": ["user_principal"],
+                "additionalProperties": False
+            },
+            "strict": True
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_admin_investment_report",
+            "description": "Returns comprehensive platform investment report with user statistics and performance metrics. Admin only.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "admin_principal": {
+                        "type": "string",
+                        "description": "The principal ID of the admin requesting the report."
+                    }
+                },
+                "required": ["admin_principal"],
                 "additionalProperties": False
             },
             "strict": True
@@ -154,39 +216,98 @@ tools = [
 ]
 
 async def call_icp_endpoint(func_name: str, args: dict):
-    if func_name == "get_current_fee_percentiles":
-        url = f"{BASE_URL}/get-current-fee-percentiles"
+    # ========== VAULT FUNCTIONS ==========
+    
+    # Token and Balance Functions
+    if func_name == "get_user_balance":
+        url = f"{BASE_URL}/balance"
+        response = requests.post(url, headers=HEADERS, json={"owner": args["user_principal"]})
+    
+    # Vault Information Functions
+    elif func_name == "get_vault_info":
+        url = f"{BASE_URL}/vault-info"
         response = requests.post(url, headers=HEADERS, json={})
-    elif func_name == "get_balance":
-        url = f"{BASE_URL}/get-balance"
-        response = requests.post(url, headers=HEADERS, json={"address": args["address"]})
-    elif func_name == "get_utxos":
-        url = f"{BASE_URL}/get-utxos"
-        response = requests.post(url, headers=HEADERS, json={"address": args["address"]})
-    elif func_name == "send":
-        url = f"{BASE_URL}/send"
-        response = requests.post(url, headers=HEADERS, json=args)
-    elif func_name == "get_p2pkh_address":
-        url = f"{BASE_URL}/get-p2pkh-address"
+    elif func_name == "get_active_products":
+        url = f"{BASE_URL}/products"
         response = requests.post(url, headers=HEADERS, json={})
-    elif func_name == "dummy_test":
-        url = f"{BASE_URL}/dummy-test"
+    elif func_name == "get_investment_instruments":
+        url = f"{BASE_URL}/get-investment-instruments"
         response = requests.post(url, headers=HEADERS, json={})
+    
+    # User Portfolio Functions
+    elif func_name == "get_user_vault_entries":
+        url = f"{BASE_URL}/user-vault-entries"
+        response = requests.post(url, headers=HEADERS, json={"user": args["user_principal"]})
+    elif func_name == "get_user_investment_report":
+        url = f"{BASE_URL}/user-investment-report"
+        response = requests.post(url, headers=HEADERS, json={"user": args["user_principal"]})
+    elif func_name == "get_unclaimed_dividends":
+        url = f"{BASE_URL}/unclaimed-dividends"
+        response = requests.post(url, headers=HEADERS, json={"user": args["user_principal"]})
+    
+    # Admin Functions
+    elif func_name == "check_admin_status":
+        url = f"{BASE_URL}/admin-check"
+        response = requests.post(url, headers=HEADERS, json={"principal": args["user_principal"]})
+    elif func_name == "get_admin_investment_report":
+        url = f"{BASE_URL}/admin-investment-report"
+        response = requests.post(url, headers=HEADERS, json={"admin_principal": args["admin_principal"]})
+    
     else:
         raise ValueError(f"Unsupported function call: {func_name}")
+    
     response.raise_for_status()
     return response.json()
+
+# Global variable to store admin principals for session-based auth
+USER_ADMIN_STATUS = {}
+
+async def check_user_admin_status(user_principal: str, ctx: Context) -> bool:
+    """Check if a user has admin privileges and cache the result."""
+    try:
+        # Check cache first
+        if user_principal in USER_ADMIN_STATUS:
+            return USER_ADMIN_STATUS[user_principal]
+        
+        # Call the admin check endpoint
+        result = await call_icp_endpoint("check_admin_status", {"user_principal": user_principal})
+        is_admin = result.get("is_admin", False)
+        
+        # Cache the result
+        USER_ADMIN_STATUS[user_principal] = is_admin
+        
+        ctx.logger.info(f"User {user_principal} admin status: {is_admin}")
+        return is_admin
+        
+    except Exception as e:
+        ctx.logger.error(f"Error checking admin status for {user_principal}: {str(e)}")
+        return False
 
 async def process_query(query: str, ctx: Context) -> str:
     try:
         # Step 1: Initial call to ASI1 with user query and tools
+        system_message = {
+            "role": "system",
+            "content": """You are a helpful AI assistant for an ICP vault system that manages USDX token investments. 
+            
+You can help users with:
+- 📊 Vault information (vault status, investment products, available instruments)
+- 💰 User portfolio management (balances, vault entries, investment reports, dividends)
+- 👑 Admin functions (for authorized administrators only)
+
+When users ask for specific data, use the available tools to fetch real information from the vault system.
+When users ask general questions or need help understanding the system, provide helpful explanations without using tools.
+
+Always be friendly, helpful, and clear in your responses."""
+        }
+        
         initial_message = {
             "role": "user",
             "content": query
         }
         payload = {
             "model": "asi1-mini",
-            "messages": [initial_message],
+            "messages": [system_message, initial_message],
             "tools": tools,
             "temperature": 0.7,
             "max_tokens": 1024
@@ -201,10 +322,11 @@ async def process_query(query: str, ctx: Context) -> str:
 
         # Step 2: Parse tool calls from response
         tool_calls = response_json["choices"][0]["message"].get("tool_calls", [])
-        messages_history = [initial_message, response_json["choices"][0]["message"]]
+        messages_history = [system_message, initial_message, response_json["choices"][0]["message"]]
 
         if not tool_calls:
-            return "I couldn't determine what Bitcoin information you're looking for. Please try rephrasing your question."
+            # Handle general questions without tool calls - let AI respond naturally
+            return response_json["choices"][0]["message"]["content"]
 
         # Step 3: Execute tools and format results
         for tool_call in tool_calls:
@@ -215,8 +337,37 @@ async def process_query(query: str, ctx: Context) -> str:
             ctx.logger.info(f"Executing {func_name} with arguments: {arguments}")
 
             try:
-                result = await call_icp_endpoint(func_name, arguments)
-                content_to_send = json.dumps(result)
+                # Check if this is an admin function that requires authentication
+                admin_functions = ["get_admin_investment_report"]
+                
+                if func_name in admin_functions:
+                    # Get admin principal from arguments
+                    admin_principal = arguments.get("admin_principal")
+                    if not admin_principal:
+                        error_content = {
+                            "error": "Admin functions require admin_principal parameter",
+                            "status": "authentication_required"
+                        }
+                        content_to_send = json.dumps(error_content)
+                    else:
+                        # Check admin status
+                        is_admin = await check_user_admin_status(admin_principal, ctx)
+                        if not is_admin:
+                            error_content = {
+                                "error": f"Access denied: {admin_principal} does not have admin privileges",
+                                "status": "unauthorized",
+                                "required_role": "admin"
+                            }
+                            content_to_send = json.dumps(error_content)
+                        else:
+                            # User is admin, proceed with function call
+                            result = await call_icp_endpoint(func_name, arguments)
+                            content_to_send = json.dumps(result)
+                else:
+                    # Regular function call
+                    result = await call_icp_endpoint(func_name, arguments)
+                    content_to_send = json.dumps(result)
+                    
             except Exception as e:
                 error_content = {
                     "error": f"Tool execution failed: {str(e)}",
@@ -334,60 +485,69 @@ async def handle_health(ctx: Context) -> HealthResponse:
 async def handle_info(ctx: Context) -> InfoResponse:
     """Agent information endpoint"""
     return InfoResponse(
-        name="Fetch.AI ICP Agent",
+        name="Fetch.AI ICP Vault Agent",
         port=8001,
         endpoints=["/api/chat", "/health", "/"],
-        description="AI agent for Bitcoin and ICP operations"
+        description="AI agent for ICP vault operations and investment management. Supports user portfolio tracking, admin functions, and comprehensive investment reporting."
     )
 
 if __name__ == "__main__":
-    print("Starting Fetch.AI agent with integrated REST endpoints on port 8001...")
+    print("Starting Fetch.AI ICP Vault Agent with integrated REST endpoints on port 8001...")
     print("Chat endpoint: http://localhost:8001/api/chat")
     print("Health endpoint: http://localhost:8001/health")
     print("Info endpoint: http://localhost:8001/")
+    print("")
+    print("Available functions:")
+    print("📊 Vault Operations: get_vault_info, get_active_products, get_investment_instruments")
+    print("💰 User Portfolio: get_user_balance, get_user_vault_entries, get_user_investment_report, get_unclaimed_dividends")
+    print("👑 Admin Functions: check_admin_status, get_admin_investment_report (requires admin privileges)")
+    print("")
     agent.run()
 
 
 """
-Queries for /get-balance
-What's the balance of address tb1qexample1234567890?
+========== EXAMPLE QUERIES ==========
 
-Can you check how many bitcoins are in tb1qabcde000001234567?
+🏦 VAULT INFORMATION QUERIES (No specific user required):
+- What's the current vault status and total locked tokens?
+- Show me all available investment products with their durations
+- List all investment instruments with their APY rates and risk levels
+- What are the current investment opportunities?
+- How much is currently locked in the vault?
+- What investment products are active right now?
 
-Show me the balance of this Bitcoin wallet: tb1qtestwalletxyz.
+💰 USER PORTFOLIO QUERIES (Replace with actual principal):
+- What's my USDX token balance? [principal: xygmt-g36ra-6fx4l-vrohf-fhtid-h7jba-gbumz-34aii-c2j73-vh53b-mqe]
+- Show me all my current vault investments and their status [principal: ddm5i-napuo-a6jjo-czjha-xcr4l-dzpqe-uygc7-w3yxz-dmqso-zd36q-eae]
+- Get my complete investment performance report [principal: xygmt-g36ra-6fx4l-vrohf-fhtid-h7jba-gbumz-34aii-c2j73-vh53b-mqe]
+- Check my unclaimed dividends and earnings [principal: ddm5i-napuo-a6jjo-czjha-xcr4l-dzpqe-uygc7-w3yxz-dmqso-zd36q-eae]
+- What's my total ROI across all investments?
+- Which of my vault entries can I unlock now?
 
-🧾 Queries for /get-utxos
-What UTXOs are available for address tb1qexampleutxo0001?
+💡 GENERAL INVESTMENT QUERIES:
+- How do dividends work in this system?
+- What are the different lock durations available?
+- Explain the investment instruments and their risk levels
+- What's the difference between flexible and time-locked staking?
+- How is the APY calculated for different instruments?
 
-List unspent outputs for tb1qunspentoutputs111.
+👑 ADMIN QUERIES (Requires admin privileges):
+- Check if I have admin privileges [principal: xygmt-g36ra-6fx4l-vrohf-fhtid-h7jba-gbumz-34aii-c2j73-vh53b-mqe]
+- Get the complete platform investment report [admin: xygmt-g36ra-6fx4l-vrohf-fhtid-h7jba-gbumz-34aii-c2j73-vh53b-mqe]
+- Show me platform-wide investment statistics and user activity
+- What are the top-performing investment products?
+- How many users are actively investing?
 
-Do I have any unspent transactions for tb1qutxotest9999?
+🔧 SYSTEM QUERIES:
+- What functions can you help me with?
+- How do I check my investment status?
+- What information do I need to provide to get my portfolio data?
+- Can you explain how to interpret my investment report?
 
-🧾 Queries for /get-current-fee-percentiles
-What are the current Bitcoin fee percentiles?
-
-Show me the latest fee percentile distribution.
-
-How much are the Bitcoin network fees right now?
-
-🧾 Queries for /get-p2pkh-address
-What is my canister's P2PKH address?
-
-Generate a Bitcoin address for me.
-
-Give me a Bitcoin address I can use to receive coins.
-
-🧾 Queries for /send
-Send 10,000 satoshis to tb1qreceiver000111.
-
-Transfer 50000 sats to tb1qsimplewalletabc.
-
-I want to send 120000 satoshis to tb1qdonationaddress001.
-
-🧾 General/Dummy Test
-Run the dummy test endpoint.
-
-Can I see a test response?
-
-Hit the dummy-test route to make sure it works.
+========== USAGE NOTES ==========
+- Replace example principals with actual user principals from your system
+- User portfolio queries require your principal ID to fetch personalized data
+- Admin functions require valid admin principal IDs and admin privileges
+- General information queries work without providing any principal ID
+- The AI can explain concepts and provide help without making tool calls
 """

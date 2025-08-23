@@ -13,7 +13,7 @@ const AiChatInterface = ({ isOpen, onClose }) => {
     {
       id: 1,
       type: 'ai',
-      content: 'Hello! I\'m your AI assistant for Bitcoin and vault operations. You can ask me about Bitcoin balances, transactions, vault information, and more!',
+      content: 'Hello! I\'m your AI assistant for USDX vault operations and investment management. You can ask me about your portfolio, vault information, investment products, dividends, and more!',
       timestamp: new Date()
     }
   ]);
@@ -94,11 +94,12 @@ const AiChatInterface = ({ isOpen, onClose }) => {
   };
 
   const suggestedQueries = [
-    "What's the balance of address tb1qexample123?",
-    "Show me the current Bitcoin fee percentiles",
-    "Get my canister's P2PKH address",
-    "Run a dummy test",
-    "What's my vault information?"
+    "What's the current vault status?",
+    "Show me all available investment products",
+    "What investment instruments are available with their APY rates?",
+    "How do dividends work in this system?",
+    "What's my USDX token balance?",
+    "Show me my current vault investments"
   ];
 
   const handleSuggestedQuery = (query) => {
@@ -126,7 +127,7 @@ const AiChatInterface = ({ isOpen, onClose }) => {
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white">AI Assistant</h3>
-              <p className="text-sm text-gray-400">Bitcoin & Vault Operations</p>
+              <p className="text-sm text-gray-400">USDX Vault & Investment Management</p>
             </div>
           </div>
           <button
@@ -206,7 +207,7 @@ const AiChatInterface = ({ isOpen, onClose }) => {
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Ask me about Bitcoin operations, vault info, or anything else..."
+                placeholder="Ask me about vault operations, investments, dividends, or anything else..."
                 rows={1}
                 className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 style={{

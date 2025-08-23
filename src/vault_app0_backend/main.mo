@@ -1964,20 +1964,104 @@ persistent actor VaultApp {
     }
   };
 
-  // Helper function to extract JSON field from request body (simplified)
+  // Helper function to extract substring from text
+  private func subText(text : Text, start : Nat, end : Nat) : Text {
+    let chars = Text.toIter(text);
+    var result = "";
+    var i = 0;
+    for (char in chars) {
+      if (i >= start and i < end) {
+        result := result # Text.fromChar(char);
+      };
+      i += 1;
+    };
+    result
+  };
+
+  // Helper function to get character at specific position
+  private func charAt(text : Text, index : Nat) : ?Text {
+    let chars = Text.toIter(text);
+    var i = 0;
+    for (char in chars) {
+      if (i == index) {
+        return ?Text.fromChar(char);
+      };
+      i += 1;
+    };
+    null
+  };
+
+  // Helper function to extract JSON field from request body
   private func extractJsonField(body : [Nat8], field : Text) : ?Text {
     let bodyText = switch (Text.decodeUtf8(Blob.fromArray(body))) {
       case (?text) { text };
       case null { return null };
     };
     
-    // Very simple approach: assume the request body contains {"field":"value"}
-    // For demo purposes, this is sufficient
+    // Simple JSON parsing - look for "field":"value" pattern
+    let searchPattern = "\"" # field # "\":";
+    let textLength = Text.size(bodyText);
+    let patternLength = Text.size(searchPattern);
+    
+    var i = 0;
+    while (i <= textLength - patternLength) {
+      let substring = subText(bodyText, i, i + patternLength);
+      if (substring == searchPattern) {
+        // Found the field, now extract the value
+        let afterPattern = subText(bodyText, i + patternLength, textLength);
+        
+        // Skip whitespace and find quote or number
+        var j = 0;
+        let afterLength = Text.size(afterPattern);
+        while (j < afterLength) {
+          let char = switch (charAt(afterPattern, j)) {
+            case (?c) { c };
+            case null { return null };
+          };
+          
+          if (char == "\"") {
+            // String value - find closing quote
+            let stringStart = j + 1;
+            var k = stringStart;
+            while (k < afterLength) {
+              let endChar = switch (charAt(afterPattern, k)) {
+                case (?c) { c };
+                case null { return null };
+              };
+              if (endChar == "\"") {
+                return ?subText(afterPattern, stringStart, k);
+              };
+              k += 1;
+            };
+            return null;
+          } else if (char >= "0" and char <= "9") {
+            // Number value - find end
+            let numberStart = j;
+            var k = j;
+            while (k < afterLength) {
+              let endChar = switch (charAt(afterPattern, k)) {
+                case (?c) { c };
+                case null { return null };
+              };
+              if (endChar == "," or endChar == "}" or endChar == " " or endChar == "\n" or endChar == "\r") {
+                return ?subText(afterPattern, numberStart, k);
+              };
+              k += 1;
+            };
+            return ?subText(afterPattern, numberStart, afterLength);
+          } else if (char != " " and char != "\t" and char != "\n" and char != "\r") {
+            return null;
+          };
+          j += 1;
+        };
+        return null;
+      };
+      i += 1;
+    };
+    
+    // Fallback for backward compatibility with existing Bitcoin endpoints
     if (field == "address") {
-      ?"tb1qexample1234567890abcdef" // Mock Bitcoin address
-    } else if (field == "owner") {
-      // Extract from a pattern like {"owner":"principal_text"}
-      ?"2vxsx-fae" // Mock principal for demo
+      ?"tb1qexample1234567890abcdef"
     } else if (field == "destinationAddress") {
       ?"tb1qdestination123456789"
     } else if (field == "amountInSatoshi") {
@@ -2077,54 +2161,249 @@ persistent actor VaultApp {
         makeJsonResponse(200, "{\"products\":" # productsJson # "}");
       };
 
-      // Mock Bitcoin endpoints for Fetch.AI compatibility
-      case ("POST", "get-balance") {
-        switch (extractJsonField(body, "address")) {
-          case (?address) {
-            makeJsonResponse(200, "{\"address\":\"" # address # "\",\"balance\":{\"confirmed\":150000,\"unconfirmed\":0}}");
+
+      // ========== REAL VAULT ENDPOINTS ==========
+
+      // User functions - accessible to all users
+      case ("POST", "user-vault-entries") {
+        switch (extractJsonField(body, "user")) {
+          case (?userText) {
+            try {
+              let user = Principal.fromText(userText);
+              let entries = await get_user_vault_entries(user);
+              let entriesJson = Array.foldLeft<{id : Nat; amount : Nat; locked_at : Nat64; unlock_time : ?Nat64; can_unlock : Bool; is_flexible : Bool; product_id : Nat; selected_duration : Types.LockDuration}, Text>(
+                entries,
+                "[",
+                func(acc, entry) {
+                  let unlockTimeText = switch (entry.unlock_time) {
+                    case null { "null" };
+                    case (?time) { Nat64.toText(time) };
+                  };
+                  let durationText = switch (entry.selected_duration) {
+                    case (#Minutes(min)) { Int.toText(min) };
+                  };
+                  let canUnlockText = if (entry.can_unlock) { "true" } else { "false" };
+                  let isFlexibleText = if (entry.is_flexible) { "true" } else { "false" };
+                  let entryJson = "{\"id\":" # Nat.toText(entry.id) # ",\"amount\":" # Nat.toText(entry.amount) # ",\"locked_at\":" # Nat64.toText(entry.locked_at) # ",\"unlock_time\":" # unlockTimeText # ",\"can_unlock\":" # canUnlockText # ",\"is_flexible\":" # isFlexibleText # ",\"product_id\":" # Nat.toText(entry.product_id) # ",\"duration_minutes\":" # durationText # "}";
+                  if (acc == "[") { acc # entryJson } else { acc # "," # entryJson }
+                }
+              ) # "]";
+              makeJsonResponse(200, "{\"entries\":" # entriesJson # ",\"user\":\"" # userText # "\"}");
+            } catch (e) {
+              makeJsonResponse(400, "{\"error\":\"Invalid principal\",\"message\":\"" # Error.message(e) # "\"}");
+            };
           };
           case null {
-            makeJsonResponse(400, "{\"error\":\"Missing address field\"}");
+            makeJsonResponse(400, "{\"error\":\"Missing user field\"}");
           };
         };
       };
 
-      case ("POST", "get-utxos") {
-        switch (extractJsonField(body, "address")) {
-          case (?address) {
-            makeJsonResponse(200, "{\"address\":\"" # address # "\",\"utxos\":[{\"txid\":\"mock_tx_123\",\"vout\":0,\"value\":50000,\"scriptPubKey\":\"mock_script\"}]}");
+      case ("POST", "user-investment-report") {
+        switch (extractJsonField(body, "user")) {
+          case (?userText) {
+            try {
+              let user = Principal.fromText(userText);
+              let reportResult = await get_user_investment_report();
+              switch (reportResult) {
+                case (#ok(report)) {
+                  let summaryJson = "{\"total_investments\":" # Nat.toText(report.summary.total_investments) # ",\"total_amount_invested\":" # Nat.toText(report.summary.total_amount_invested) # ",\"total_current_value\":" # Nat.toText(report.summary.total_current_value) # ",\"total_dividends_earned\":" # Nat.toText(report.summary.total_dividends_earned) # ",\"total_dividends_claimed\":" # Nat.toText(report.summary.total_dividends_claimed) # ",\"average_roi\":" # Float.toText(report.summary.average_roi) # ",\"active_investments\":" # Nat.toText(report.summary.active_investments) # ",\"completed_investments\":" # Nat.toText(report.summary.completed_investments) # "}";
+                  makeJsonResponse(200, "{\"summary\":" # summaryJson # ",\"user\":\"" # Principal.toText(report.user) # "\"}");
+                };
+                case (#err(error)) {
+                  makeJsonResponse(400, "{\"error\":\"" # error # "\"}");
+                };
+              };
+            } catch (e) {
+              makeJsonResponse(400, "{\"error\":\"Invalid principal\",\"message\":\"" # Error.message(e) # "\"}");
+            };
           };
           case null {
-            makeJsonResponse(400, "{\"error\":\"Missing address field\"}");
+            makeJsonResponse(400, "{\"error\":\"Missing user field\"}");
           };
         };
       };
 
-      case ("POST", "get-current-fee-percentiles") {
-        makeJsonResponse(200, "{\"fee_percentiles\":[1,2,3,5,8,13,21,34,55,89]}");
+      case ("POST", "unclaimed-dividends") {
+        switch (extractJsonField(body, "user")) {
+          case (?userText) {
+            try {
+              let user = Principal.fromText(userText);
+              let dividends = await get_unclaimed_dividends(user);
+              let dividendsJson = Array.foldLeft<(Nat, Nat), Text>(
+                dividends,
+                "[",
+                func(acc, dividend) {
+                  let dividendJson = "{\"distribution_id\":" # Nat.toText(dividend.0) # ",\"amount\":" # Nat.toText(dividend.1) # "}";
+                  if (acc == "[") { acc # dividendJson } else { acc # "," # dividendJson }
+                }
+              ) # "]";
+              makeJsonResponse(200, "{\"unclaimed_dividends\":" # dividendsJson # ",\"user\":\"" # userText # "\"}");
+            } catch (e) {
+              makeJsonResponse(400, "{\"error\":\"Invalid principal\",\"message\":\"" # Error.message(e) # "\"}");
+            };
+          };
+          case null {
+            makeJsonResponse(400, "{\"error\":\"Missing user field\"}");
+          };
+        };
       };
 
-      case ("POST", "get-p2pkh-address") {
-        makeJsonResponse(200, "{\"address\":\"bc1qmock_address_example_123456789\"}");
-      };
-
-      case ("POST", "send") {
-        switch (extractJsonField(body, "destinationAddress"), extractJsonField(body, "amountInSatoshi")) {
-          case (?destAddr, ?amountStr) {
-            makeJsonResponse(200, "{\"txid\":\"mock_tx_send_123\",\"status\":\"success\",\"destination\":\"" # destAddr # "\",\"amount\":" # amountStr # "}");
+      case ("POST", "lock-tokens") {
+        switch (extractJsonField(body, "amount"), extractJsonField(body, "product_id"), extractJsonField(body, "duration_minutes")) {
+          case (?amountText, ?productIdText, ?durationText) {
+            try {
+              let amount = switch (Nat.fromText(amountText)) {
+                case null { return makeJsonResponse(400, "{\"error\":\"Invalid amount\"}"); };
+                case (?n) { n };
+              };
+              let productId = switch (Nat.fromText(productIdText)) {
+                case null { return makeJsonResponse(400, "{\"error\":\"Invalid product_id\"}"); };
+                case (?n) { n };
+              };
+              let durationMinutes = switch (Nat.fromText(durationText)) {
+                case null { return makeJsonResponse(400, "{\"error\":\"Invalid duration_minutes\"}"); };
+                case (?n) { n };
+              };
+              let duration : Types.LockDuration = #Minutes(durationMinutes);
+              
+              // Note: This would need to be called by a user, but HTTP endpoints don't have caller context
+              // In a real implementation, you'd need to authenticate the user somehow
+              makeJsonResponse(400, "{\"error\":\"Lock tokens requires user authentication - use canister calls instead\"}");
+            } catch (e) {
+              makeJsonResponse(400, "{\"error\":\"Invalid parameters\",\"message\":\"" # Error.message(e) # "\"}");
+            };
           };
           case _ {
-            makeJsonResponse(400, "{\"error\":\"Missing destinationAddress or amountInSatoshi fields\"}");
+            makeJsonResponse(400, "{\"error\":\"Missing required fields: amount, product_id, duration_minutes\"}");
           };
         };
       };
 
-      case ("POST", "dummy-test") {
-        makeJsonResponse(200, "{\"message\":\"Dummy test successful\",\"timestamp\":" # Nat64.toText(now()) # ",\"canister\":\"vault_app0_backend\"}");
+      case ("POST", "claim-dividend") {
+        switch (extractJsonField(body, "distribution_id")) {
+          case (?distributionIdText) {
+            try {
+              let distributionId = switch (Nat.fromText(distributionIdText)) {
+                case null { return makeJsonResponse(400, "{\"error\":\"Invalid distribution_id\"}"); };
+                case (?n) { n };
+              };
+              // Note: This would need to be called by a user, but HTTP endpoints don't have caller context
+              makeJsonResponse(400, "{\"error\":\"Claim dividend requires user authentication - use canister calls instead\"}");
+            } catch (e) {
+              makeJsonResponse(400, "{\"error\":\"Invalid parameters\",\"message\":\"" # Error.message(e) # "\"}");
+            };
+          };
+          case null {
+            makeJsonResponse(400, "{\"error\":\"Missing distribution_id field\"}");
+          };
+        };
+      };
+
+      // Admin functions - require authentication
+      case ("POST", "admin-check") {
+        switch (extractJsonField(body, "principal")) {
+          case (?principalText) {
+            try {
+              let principal = Principal.fromText(principalText);
+              let isAdminResult = isAdmin(principal);
+              let isAdminText = if (isAdminResult) { "true" } else { "false" };
+              makeJsonResponse(200, "{\"is_admin\":" # isAdminText # ",\"principal\":\"" # principalText # "\"}");
+            } catch (e) {
+              makeJsonResponse(400, "{\"error\":\"Invalid principal\",\"message\":\"" # Error.message(e) # "\"}");
+            };
+          };
+          case null {
+            makeJsonResponse(400, "{\"error\":\"Missing principal field\"}");
+          };
+        };
+      };
+
+      case ("POST", "admin-investment-report") {
+        switch (extractJsonField(body, "admin_principal")) {
+          case (?adminText) {
+            try {
+              let adminPrincipal = Principal.fromText(adminText);
+              if (not isAdmin(adminPrincipal)) {
+                return makeJsonResponse(403, "{\"error\":\"Unauthorized - admin access required\"}");
+              };
+              
+              let reportResult = await admin_get_investment_report();
+              switch (reportResult) {
+                case (#ok(report)) {
+                  let summaryJson = "{\"total_investments\":" # Nat.toText(report.platform_summary.total_investments) # ",\"total_amount_invested\":" # Nat.toText(report.platform_summary.total_amount_invested) # ",\"total_current_value\":" # Nat.toText(report.platform_summary.total_current_value) # ",\"active_investments\":" # Nat.toText(report.platform_summary.active_investments) # ",\"completed_investments\":" # Nat.toText(report.platform_summary.completed_investments) # ",\"average_roi\":" # Float.toText(report.platform_summary.average_roi) # "}";
+                  makeJsonResponse(200, "{\"total_users\":" # Nat.toText(report.total_users) # ",\"platform_summary\":" # summaryJson # "}");
+                };
+                case (#err(error)) {
+                  makeJsonResponse(400, "{\"error\":\"" # error # "\"}");
+                };
+              };
+            } catch (e) {
+              makeJsonResponse(400, "{\"error\":\"Invalid principal\",\"message\":\"" # Error.message(e) # "\"}");
+            };
+          };
+          case null {
+            makeJsonResponse(400, "{\"error\":\"Missing admin_principal field\"}");
+          };
+        };
+      };
+
+      case ("POST", "admin-distribute-dividend") {
+        switch (extractJsonField(body, "admin_principal"), extractJsonField(body, "amount")) {
+          case (?adminText, ?amountText) {
+            try {
+              let adminPrincipal = Principal.fromText(adminText);
+              if (not isAdmin(adminPrincipal)) {
+                return makeJsonResponse(403, "{\"error\":\"Unauthorized - admin access required\"}");
+              };
+              
+              let amount = switch (Nat.fromText(amountText)) {
+                case null { return makeJsonResponse(400, "{\"error\":\"Invalid amount\"}"); };
+                case (?n) { n };
+              };
+              
+              // Note: This would need proper caller authentication in a real implementation
+              makeJsonResponse(400, "{\"error\":\"Admin functions require proper authentication - use canister calls instead\"}");
+            } catch (e) {
+              makeJsonResponse(400, "{\"error\":\"Invalid parameters\",\"message\":\"" # Error.message(e) # "\"}");
+            };
+          };
+          case _ {
+            makeJsonResponse(400, "{\"error\":\"Missing required fields: admin_principal, amount\"}");
+          };
+        };
+      };
+
+      case ("POST", "get-investment-instruments") {
+        let instruments = await get_active_investment_instruments();
+        let instrumentsJson = Array.foldLeft<Types.InvestmentInstrument, Text>(
+          instruments,
+          "[",
+          func(acc, instrument) {
+            let typeText = switch (instrument.instrument_type) {
+              case (#OnChain(_)) { "OnChain" };
+              case (#OffChain(_)) { "OffChain" };
+              case (#Liquidity(_)) { "Liquidity" };
+              case (#Staking(_)) { "Staking" };
+              case (#Lending(_)) { "Lending" };
+            };
+            let maxInvestmentText = switch (instrument.max_investment) {
+              case null { "null" };
+              case (?max) { Nat.toText(max) };
+            };
+            let lockPeriodText = switch (instrument.lock_period_days) {
+              case null { "null" };
+              case (?days) { Nat.toText(days) };
+            };
+            let instrumentJson = "{\"id\":" # Nat.toText(instrument.id) # ",\"name\":\"" # instrument.name # "\",\"description\":\"" # instrument.description # "\",\"type\":\"" # typeText # "\",\"expected_apy\":" # Float.toText(instrument.expected_apy) # ",\"risk_level\":" # Nat.toText(instrument.risk_level) # ",\"min_investment\":" # Nat.toText(instrument.min_investment) # ",\"max_investment\":" # maxInvestmentText # ",\"lock_period_days\":" # lockPeriodText # ",\"total_invested\":" # Nat.toText(instrument.total_invested) # ",\"total_yield_earned\":" # Nat.toText(instrument.total_yield_earned) # "}";
+            if (acc == "[") { acc # instrumentJson } else { acc # "," # instrumentJson }
+          }
+        ) # "]";
+        makeJsonResponse(200, "{\"instruments\":" # instrumentsJson # "}");
       };
 
       case _ {
-        makeJsonResponse(404, "{\"error\":\"Endpoint not found\",\"available_endpoints\":[\"balance\",\"vault-info\",\"products\",\"get-balance\",\"get-utxos\",\"send\",\"dummy-test\"],\"received_url\":\"" # normalizedUrl # "\"}");
+        makeJsonResponse(404, "{\"error\":\"Endpoint not found\",\"available_endpoints\":[\"balance\",\"vault-info\",\"products\",\"user-vault-entries\",\"user-investment-report\",\"unclaimed-dividends\",\"lock-tokens\",\"claim-dividend\",\"admin-check\",\"admin-investment-report\",\"admin-distribute-dividend\",\"get-investment-instruments\"],\"received_url\":\"" # normalizedUrl # "\"}");
       };
     };
   };
