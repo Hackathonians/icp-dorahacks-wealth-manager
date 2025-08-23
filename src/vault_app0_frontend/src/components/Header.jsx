@@ -29,18 +29,18 @@ const Header = () => {
           </div>
           
           <div className="flex items-center space-x-4">
-            {/* AI Chat Button */}
-            <button
-              onClick={() => setIsChatOpen(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 transition-colors"
-              title="Chat with AI Assistant"
-            >
-              <ChatBubbleLeftRightIcon className="w-4 h-4" />
-              <span>AI Chat</span>
-            </button>
-
             {isAuthenticated ? (
               <div className="flex items-center space-x-4">
+                {/* AI Chat Button - Only visible when authenticated */}
+                <button
+                  onClick={() => setIsChatOpen(true)}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 transition-colors"
+                  title="Chat with AI Assistant"
+                >
+                  <ChatBubbleLeftRightIcon className="w-4 h-4" />
+                  <span>AI Chat</span>
+                </button>
+                
                 <div className="glass rounded-lg px-4 py-2">
                   <p className="text-white text-sm font-medium">Connected</p>
                   <p className="text-white text-opacity-70 text-xs font-mono">
@@ -73,11 +73,13 @@ const Header = () => {
         </div>
       </div>
       
-      {/* AI Chat Interface */}
-      <AiChatInterface 
-        isOpen={isChatOpen} 
-        onClose={() => setIsChatOpen(false)} 
-      />
+      {/* AI Chat Interface - Only render when authenticated */}
+      {isAuthenticated && (
+        <AiChatInterface 
+          isOpen={isChatOpen} 
+          onClose={() => setIsChatOpen(false)} 
+        />
+      )}
     </header>
   );
 };

@@ -109,7 +109,7 @@ const AiChatInterface = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex flex-wrap items-center justify-center p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
@@ -117,9 +117,9 @@ const AiChatInterface = ({ isOpen, onClose }) => {
       />
       
       {/* Chat Interface */}
-      <div className="relative w-full max-w-2xl max-h-[80vh] bg-gray-900 rounded-xl shadow-2xl border border-gray-700 flex flex-col m-4">
+      <div className="relative w-full max-w-2xl h-[80vh] bg-gray-900 rounded-xl shadow-2xl border border-gray-700 flex flex-col mt-8">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-gray-700 mt-4">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
               <SparklesIcon className="w-5 h-5 text-white" />
