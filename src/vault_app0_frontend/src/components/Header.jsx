@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { WalletIcon, ArrowRightOnRectangleIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import { WalletIcon, ArrowRightOnRectangleIcon, LockClosedIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import AiChatInterface from './AiChatInterface';
 
 const Header = () => {
   const { isAuthenticated, principal, login, logout, loading } = useAuth();
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const formatPrincipal = (principal) => {
     if (!principal) return '';
@@ -27,6 +29,16 @@ const Header = () => {
           </div>
           
           <div className="flex items-center space-x-4">
+            {/* AI Chat Button */}
+            <button
+              onClick={() => setIsChatOpen(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 transition-colors"
+              title="Chat with AI Assistant"
+            >
+              <ChatBubbleLeftRightIcon className="w-4 h-4" />
+              <span>AI Chat</span>
+            </button>
+
             {isAuthenticated ? (
               <div className="flex items-center space-x-4">
                 <div className="glass rounded-lg px-4 py-2">
@@ -60,6 +72,12 @@ const Header = () => {
           </div>
         </div>
       </div>
+      
+      {/* AI Chat Interface */}
+      <AiChatInterface 
+        isOpen={isChatOpen} 
+        onClose={() => setIsChatOpen(false)} 
+      />
     </header>
   );
 };
