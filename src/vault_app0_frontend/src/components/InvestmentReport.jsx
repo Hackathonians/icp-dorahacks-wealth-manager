@@ -84,8 +84,8 @@ const InvestmentReport = () => {
     // Handle both object format and direct number format
     if (typeof duration === 'number') {
       minutes = duration;
-    } else if (duration && 'Minutes' in duration) {
-      minutes = duration.Minutes;
+    } else if (duration && duration.Minutes) {
+      minutes = Number(duration.Minutes);
     } else {
       return 'Unknown';
     }

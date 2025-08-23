@@ -106,8 +106,7 @@ module {
 
   // Product Types
   public type LockDuration = {
-    #Flexible; // Can withdraw anytime
-    #Minutes : Nat; // Lock for specified minutes
+    #Minutes : Int; // Lock for specified minutes, -1 means flexible (can withdraw anytime)
   };
 
   public type Product = {
@@ -139,10 +138,178 @@ module {
     total_locked_at_distribution : Tokens;
   };
 
+  // Investment Tracking Types
+  public type InvestmentStatus = {
+    #Active;
+    #Completed;
+    #Cancelled;
+  };
+
+  public type InvestmentRecord = {
+    id : Nat;
+    user : Principal;
+    vault_entry_id : Nat;
+    initial_amount : Tokens;
+    current_value : Tokens;
+    total_dividends_earned : Tokens;
+    total_dividends_claimed : Tokens;
+    roi_percentage : Float; // Return on Investment percentage
+    created_at : Timestamp;
+    last_updated : Timestamp;
+    status : InvestmentStatus;
+    product_name : Text;
+    duration_type : LockDuration;
+  };
+
+  public type InvestmentSummary = {
+    total_investments : Nat;
+    total_amount_invested : Tokens;
+    total_current_value : Tokens;
+    total_dividends_earned : Tokens;
+    total_dividends_claimed : Tokens;
+    average_roi : Float;
+    active_investments : Nat;
+    completed_investments : Nat;
+  };
+
+  public type UserInvestmentReport = {
+    user : Principal;
+    summary : InvestmentSummary;
+    investments : [InvestmentRecord];
+    unclaimed_dividends : [(Nat, Tokens)]; // (distribution_id, amount)
+  };
+
+  public type AdminInvestmentReport = {
+    total_users : Nat;
+    platform_summary : InvestmentSummary;
+    top_investors : [(Principal, Tokens)]; // (user, total_invested)
+    product_performance : [(Nat, Text, Tokens, Nat)]; // (product_id, name, total_locked, user_count)
+    recent_activities : [InvestmentActivity];
+  };
+
+  public type InvestmentActivity = {
+    id : Nat;
+    user : Principal;
+    activity_type : ActivityType;
+    amount : Tokens;
+    timestamp : Timestamp;
+    product_id : ?Nat;
+  };
+
+  public type ActivityType = {
+    #Lock : { duration : LockDuration };
+    #Unlock;
+    #DividendClaim : { distribution_id : Nat };
+    #DividendDistribution;
+  };
+
+  // Investment Instrument Types
+  public type InstrumentType = {
+    #OnChain : { protocol : Text; contract_address : ?Text };
+    #OffChain : { provider : Text; instrument_name : Text };
+    #Liquidity : { dex : Text; pair : Text };
+    #Staking : { validator : Text; network : Text };
+    #Lending : { platform : Text; asset : Text };
+  };
+
+  public type InstrumentStatus = {
+    #Active;
+    #Paused;
+    #Liquidating;
+    #Closed;
+  };
+
+  public type InvestmentInstrument = {
+    id : Nat;
+    name : Text;
+    description : Text;
+    instrument_type : InstrumentType;
+    expected_apy : Float; // Annual Percentage Yield
+    risk_level : Nat; // 1-10 scale (1 = lowest risk, 10 = highest risk)
+    min_investment : Tokens;
+    max_investment : ?Tokens; // null means no limit
+    lock_period_days : ?Nat; // null means flexible
+    status : InstrumentStatus;
+    total_invested : Tokens;
+    total_yield_earned : Tokens;
+    created_at : Timestamp;
+    last_updated : Timestamp;
+  };
+
+  public type InstrumentInvestment = {
+    id : Nat;
+    instrument_id : Nat;
+    amount_invested : Tokens;
+    current_value : Tokens;
+    yield_earned : Tokens;
+    invested_at : Timestamp;
+    last_yield_update : Timestamp;
+    status : InvestmentStatus;
+    exit_strategy : ?ExitStrategy;
+  };
+
+  public type ExitStrategy = {
+    #Immediate;
+    #Scheduled : { exit_date : Timestamp };
+    #Conditional : { target_yield : Float };
+    #Gradual : { percentage_per_period : Float; period_days : Nat };
+  };
+
+  public type YieldDistribution = {
+    id : Nat;
+    instrument_investment_id : Nat;
+    yield_amount : Tokens;
+    distribution_date : Timestamp;
+    distribution_type : YieldType;
+  };
+
+  public type YieldType = {
+    #Interest;
+    #Dividends;
+    #TradingFees;
+    #StakingRewards;
+    #LiquidityMining;
+    #Other : Text;
+  };
+
+  public type InvestmentStrategy = {
+    id : Nat;
+    name : Text;
+    description : Text;
+    allocation_rules : [AllocationRule];
+    rebalance_frequency_days : Nat;
+    max_risk_level : Nat;
+    target_apy : Float;
+    is_active : Bool;
+    created_at : Timestamp;
+  };
+
+  public type AllocationRule = {
+    instrument_type : InstrumentType;
+    min_percentage : Float;
+    max_percentage : Float;
+    priority : Nat; // 1 = highest priority
+  };
+
+  public type VaultInvestmentSummary = {
+    total_vault_balance : Tokens;
+    total_invested_in_instruments : Tokens;
+    total_available_for_investment : Tokens;
+    total_yield_earned : Tokens;
+    weighted_average_apy : Float;
+    active_instruments : Nat;
+    investment_diversity_score : Float; // 0-100 scale
+  };
+
   // Admin Types
   public type AdminAction = {
     #TransferTokens : { to : Principal; amount : Tokens };
     #DistributeDividend : { amount : Tokens };
     #SetVaultLockPeriod : { period_seconds : Nat64 };
+    #GenerateReport : { report_type : Text };
+    #CreateInstrument : { instrument : InvestmentInstrument };
+    #InvestInInstrument : { instrument_id : Nat; amount : Tokens };
+    #ExitInstrument : { investment_id : Nat; strategy : ExitStrategy };
+    #UpdateYield : { investment_id : Nat; new_yield : Tokens };
   };
 };
