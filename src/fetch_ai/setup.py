@@ -1,5 +1,7 @@
 import requests
 import json
+import os
+from dotenv import load_dotenv
 from uagents_core.contrib.protocols.chat import (
     chat_protocol_spec,
     ChatMessage,
@@ -10,6 +12,9 @@ from uagents_core.contrib.protocols.chat import (
 from uagents import Agent, Context, Protocol, Model
 from datetime import datetime, timezone
 from uuid import uuid4
+
+# Load environment variables
+load_dotenv()
 
 # Request and Response Models for REST endpoints
 class ChatRequest(Model):
@@ -31,14 +36,14 @@ class InfoResponse(Model):
     description: str
 
 # ASI1 API settings
-ASI1_API_KEY = "sk_35b5bd1888f243899624dfb068ad0f086800983c2d63455db891a017dae34339"  # Replace with your ASI1 key
+ASI1_API_KEY = os.getenv("ASI1_API_KEY")
 ASI1_BASE_URL = "https://api.asi1.ai/v1"
 ASI1_HEADERS = {
     "Authorization": f"Bearer {ASI1_API_KEY}",
     "Content-Type": "application/json"
 }
 
-CANISTER_ID = "u6s2n-gx777-77774-qaaba-cai" # Backend canister ID (vault_app0_backend)
+CANISTER_ID = os.getenv("CANISTER_ID_VAULT_APP0_BACKEND")
 BASE_URL = "http://127.0.0.1:4943"
 
 HEADERS = {

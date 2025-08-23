@@ -71,6 +71,7 @@ src/vault_app0_frontend/
 - [DFX SDK](https://internetcomputer.org/docs/current/developer-docs/setup/install/) (latest version)
 - [Node.js](https://nodejs.org/) (v16 or higher)
 - [npm](https://www.npmjs.com/) (v7 or higher)
+- [Python](https://www.python.org/downloads/) (v3.8 or higher) - for AI chat agent
 
 ### Installation & Deployment
 
@@ -80,21 +81,38 @@ src/vault_app0_frontend/
    cd vault_app0
    ```
 
-2. **Install dependencies:**
+2. **Set up environment variables:**
 
    ```bash
+   cp .env.example .env
+   ```
+   
+   Edit `.env` and configure the following variables according to your setup:
+   ```bash
+   # Required for AI chat agent
+   ASI1_API_KEY='your-asi1-api-key-here'
+   CANISTER_ID_VAULT_APP0_BACKEND='your-backend-canister-id'
+   
+   # DFX environment variables (will be populated after deployment)
+   CANISTER_ID_INTERNET_IDENTITY='your-identity-canister-id'
+   CANISTER_ID_VAULT_APP0_FRONTEND='your-frontend-canister-id'
+   ```
+
+3. **Install dependencies:**
+
+   ```bash
+   # Frontend dependencies
    cd src/vault_app0_frontend
    npm install
    cd ../..
+   
+   # AI agent dependencies
+   cd src/fetch_ai
+   pip install -r requirements.txt
+   cd ../..
    ```
 
-3. **Start DFX:**
-
-   ```bash
-   dfx start --background --clean
-   ```
-
-4. **Deploy the application:**
+4. **Deploy the main application:**
 
    ```bash
    ./deploy.sh
@@ -103,18 +121,30 @@ src/vault_app0_frontend/
    Or manually:
 
    ```bash
+   dfx start --background --clean
    dfx deploy vault_app0_backend
    dfx generate vault_app0_backend
    dfx deploy vault_app0_frontend
    ```
 
-5. **Access the application:**
+5. **Start the AI chat agent (optional):**
+
+   ```bash
+   cd src/fetch_ai
+   python setup.py
+   ```
+   
+   The AI agent will be available at:
+   - Chat endpoint: `http://localhost:8001/api/chat`
+   - Health endpoint: `http://localhost:8001/health`
+
+6. **Access the application:**
    - Local: `http://localhost:4943?canisterId=<frontend_canister_id>`
    - Get canister ID: `dfx canister id vault_app0_frontend`
 
 ### Configuration
 
-Update the admin principal in `src/vault_app0_backend/main.mo`:
+The deployment script automatically sets your current identity as the admin principal. To manually update the admin principal in `src/vault_app0_backend/main.mo`:
 
 ```motoko
 private let admin : Principal = Principal.fromText("YOUR_PRINCIPAL_HERE");
