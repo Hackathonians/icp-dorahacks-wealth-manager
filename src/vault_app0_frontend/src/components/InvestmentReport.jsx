@@ -357,7 +357,7 @@ const InvestmentReport = () => {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {adminReport.recent_activities.slice(0, 20).map((activity) => (
-                      <tr key={activity.id}>
+                      <tr kaey={activity.id}>
                         <td className="px-4 py-2 text-sm text-gray-900 font-mono">{activity.user.toString().slice(0, 15)}...</td>
                         <td className="px-4 py-2 text-sm text-gray-900">{getActivityTypeText(activity.activity_type)}</td>
                         <td className="px-4 py-2 text-sm text-gray-900">{formatTokenAmount(activity.amount)} USDX</td>
