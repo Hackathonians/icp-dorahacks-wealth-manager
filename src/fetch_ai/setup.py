@@ -7,9 +7,28 @@ from uagents_core.contrib.protocols.chat import (
     TextContent,
     StartSessionContent,
 )
-from uagents import Agent, Context, Protocol
-from datetime import datetime, timezone, timedelta
+from uagents import Agent, Context, Protocol, Model
+from datetime import datetime, timezone
 from uuid import uuid4
+
+# Request and Response Models for REST endpoints
+class ChatRequest(Model):
+    message: str
+
+class ChatResponse(Model):
+    response: str
+    timestamp: str
+
+class HealthResponse(Model):
+    status: str
+    service: str
+    timestamp: str
+
+class InfoResponse(Model):
+    name: str
+    port: int
+    endpoints: list
+    description: str
 
 # ASI1 API settings
 ASI1_API_KEY = "sk_35b5bd1888f243899624dfb068ad0f086800983c2d63455db891a017dae34339"  # Replace with your ASI1 key
@@ -19,7 +38,7 @@ ASI1_HEADERS = {
     "Content-Type": "application/json"
 }
 
-CANISTER_ID = "uzt4z-lp777-77774-qaabq-cai" # Replace with your canister ID
+CANISTER_ID = "u6s2n-gx777-77774-qaaba-cai" # Backend canister ID (vault_app0_backend)
 BASE_URL = "http://127.0.0.1:4943"
 
 HEADERS = {
@@ -237,7 +256,8 @@ async def process_query(query: str, ctx: Context) -> str:
 agent = Agent(
     name='test-ICP-agent',
     port=8001,
-    mailbox=True
+    mailbox=True,
+    endpoint=["http://localhost:8001"]
 )
 chat_proto = Protocol(spec=chat_protocol_spec)
 
@@ -283,7 +303,48 @@ async def handle_chat_acknowledgement(ctx: Context, sender: str, msg: ChatAcknow
 
 agent.include(chat_proto)
 
+# Native Agent REST Endpoints
+@agent.on_rest_post("/api/chat", ChatRequest, ChatResponse)
+async def handle_chat_rest(ctx: Context, req: ChatRequest) -> ChatResponse:
+    """REST endpoint for frontend chat interface"""
+    try:
+        ctx.logger.info(f"Received REST chat message: {req.message}")
+        response_text = await process_query(req.message, ctx)
+        return ChatResponse(
+            response=response_text,
+            timestamp=datetime.now().isoformat()
+        )
+    except Exception as e:
+        ctx.logger.error(f"Error in REST chat endpoint: {e}")
+        return ChatResponse(
+            response=f"An error occurred: {str(e)}",
+            timestamp=datetime.now().isoformat()
+        )
+
+@agent.on_rest_get("/health", HealthResponse)
+async def handle_health(ctx: Context) -> HealthResponse:
+    """Health check endpoint"""
+    return HealthResponse(
+        status="healthy",
+        service="Fetch.AI Agent",
+        timestamp=datetime.now().isoformat()
+    )
+
+@agent.on_rest_get("/", InfoResponse)
+async def handle_info(ctx: Context) -> InfoResponse:
+    """Agent information endpoint"""
+    return InfoResponse(
+        name="Fetch.AI ICP Agent",
+        port=8001,
+        endpoints=["/api/chat", "/health", "/"],
+        description="AI agent for Bitcoin and ICP operations"
+    )
+
 if __name__ == "__main__":
+    print("Starting Fetch.AI agent with integrated REST endpoints on port 8001...")
+    print("Chat endpoint: http://localhost:8001/api/chat")
+    print("Health endpoint: http://localhost:8001/health")
+    print("Info endpoint: http://localhost:8001/")
     agent.run()
 
 

@@ -1,6 +1,65 @@
 import Principal "mo:base/Principal";
 
 module {
+  // HTTP Request Types
+  public type HttpRequest = {
+    method : Text;
+    url : Text;
+    headers : [(Text, Text)];
+    body : [Nat8];
+    certificate_version : ?Nat16;
+  };
+
+  public type HttpResponse = {
+    status_code : Nat16;
+    headers : [(Text, Text)];
+    body : [Nat8];
+    streaming_strategy : ?StreamingStrategy;
+    upgrade : ?Bool;
+  };
+
+  public type StreamingStrategy = {
+    #Callback : {
+      callback : StreamingCallback;
+      token : StreamingToken;
+    };
+  };
+
+  public type StreamingCallback = query (StreamingToken) -> async (?StreamingCallbackHttpResponse);
+
+  public type StreamingToken = {
+    key : Text;
+    content_encoding : Text;
+    index : Nat;
+    sha256 : ?[Nat8];
+  };
+
+  public type StreamingCallbackHttpResponse = {
+    body : [Nat8];
+    token : ?StreamingToken;
+  };
+
+  // Bitcoin API Types (for mocking Bitcoin functionality)
+  public type BitcoinAddress = Text;
+  
+  public type BitcoinBalance = {
+    confirmed : Nat64;
+    unconfirmed : Nat64;
+  };
+
+  public type UTXO = {
+    txid : Text;
+    vout : Nat32;
+    value : Nat64;
+    scriptPubKey : Text;
+  };
+
+  public type FeePercentiles = [Nat64];
+
+  public type SendResult = {
+    txid : Text;
+    status : Text;
+  };
   // ICRC-1 Types
   public type Account = {
     owner : Principal;
