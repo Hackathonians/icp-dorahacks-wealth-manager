@@ -28,16 +28,32 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
+  useEffect(() => {
+    // Refresh auth when window regains focus
+    const handleFocus = () => {
+      if (authClient) {
+        refreshAuth();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [authClient]);
+
   const initAuth = async () => {
     try {
       const client = await AuthClient.create();
       setAuthClient(client);
 
+      // Single check with proper error handling
       const isAuthenticated = await client.isAuthenticated();
+      console.log('Auth initialization - isAuthenticated:', isAuthenticated);
+      
       setIsAuthenticated(isAuthenticated);
 
       if (isAuthenticated) {
         const identity = client.getIdentity();
+        console.log('Auth initialization - identity:', identity.getPrincipal().toString());
         setIdentity(identity);
         setPrincipal(identity.getPrincipal());
         await createActor(identity);
@@ -81,6 +97,8 @@ export const AuthProvider = ({ children }) => {
       console.log('identityProvider', identityProvider);
       await authClient.login({
         identityProvider,
+        // Set a longer session timeout (8 hours)
+        maxTimeToLive: BigInt(8 * 60 * 60 * 1000 * 1000 * 1000),
         onSuccess: async () => {
           const identity = authClient.getIdentity();
           setIdentity(identity);
@@ -111,6 +129,42 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Add a refresh method to re-check authentication without losing session
+  const refreshAuth = async () => {
+    if (!authClient) return;
+    
+    try {
+      const isAuthenticated = await authClient.isAuthenticated();
+      console.log('Auth refresh - isAuthenticated:', isAuthenticated);
+      
+      // Debug: Check stored keys again during refresh
+      if (typeof window !== 'undefined') {
+        const storedKeys = Object.keys(localStorage).filter(key => 
+          key.includes('ic-') || key.includes('identity') || key.includes('auth')
+        );
+        console.log('Auth refresh - stored keys:', storedKeys);
+      }
+      
+      if (isAuthenticated) {
+        const identity = authClient.getIdentity();
+        console.log('Auth refresh - identity:', identity.getPrincipal().toString());
+        console.log('Auth refresh - identity delegations:', identity.getDelegation?.());
+        setIdentity(identity);
+        setPrincipal(identity.getPrincipal());
+        setIsAuthenticated(true);
+        await createActor(identity);
+      } else {
+        console.log('Auth refresh - not authenticated, clearing state');
+        setIsAuthenticated(false);
+        setIdentity(null);
+        setPrincipal(null);
+        setActor(null);
+      }
+    } catch (error) {
+      console.error('Auth refresh failed:', error);
+    }
+  };
+
   const value = {
     isAuthenticated,
     identity,
@@ -119,6 +173,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     logout,
+    refreshAuth,
   };
 
   return (

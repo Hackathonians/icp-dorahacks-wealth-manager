@@ -5,7 +5,7 @@ import AiChatInterface from './AiChatInterface';
 import toast from 'react-hot-toast';
 
 const Header = () => {
-  const { isAuthenticated, principal, actor, login, logout, loading } = useAuth();
+  const { isAuthenticated, principal, actor, login, logout, loading, refreshAuth } = useAuth();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [faucetLoading, setFaucetLoading] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
@@ -50,7 +50,7 @@ const Header = () => {
   };
 
   const handleGetTestTokens = async () => {
-    if (!actor || cooldownRemaining > 0 || faucetLoading) return;
+    if (!actor || !principal || cooldownRemaining > 0 || faucetLoading) return;
 
     try {
       setFaucetLoading(true);
@@ -58,13 +58,19 @@ const Header = () => {
 
       if ('ok' in result) {
         const currentTime = Date.now();
-        localStorage.setItem(`faucet_last_request_${principal.toString()}`, currentTime.toString());
+        // Ensure principal exists before using it
+        if (principal) {
+          localStorage.setItem(`faucet_last_request_${principal.toString()}`, currentTime.toString());
+        }
         updateCooldown(currentTime);
         
         toast.success('🎉 Got 100 USDX test tokens!', {
           duration: 3000,
           icon: '🪙',
         });
+
+        // Refresh authentication state to ensure it persists
+        await refreshAuth();
       } else {
         toast.error(result.err);
       }

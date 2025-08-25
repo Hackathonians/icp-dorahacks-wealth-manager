@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { GiftIcon, ClockIcon, BeakerIcon } from '@heroicons/react/24/outline';
 
 const TestTokenFaucet = ({ onTokensReceived }) => {
-  const { actor, principal } = useAuth();
+  const { actor, principal, refreshAuth } = useAuth();
   const [loading, setLoading] = useState(false);
   const [lastRequestTime, setLastRequestTime] = useState(null);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
@@ -49,21 +49,33 @@ const TestTokenFaucet = ({ onTokensReceived }) => {
   };
 
   const handleGetTestTokens = async () => {
-    if (!actor || cooldownRemaining > 0) return;
+    if (!actor || !principal || cooldownRemaining > 0) return;
 
     try {
       setLoading(true);
+      console.log('Faucet: Before token request - principal:', principal.toString());
+      
       const result = await actor.faucet_get_test_tokens();
+      console.log('Faucet: Token request result:', result);
 
       if ('ok' in result) {
         const currentTime = Date.now();
         setLastRequestTime(currentTime);
-        localStorage.setItem(`faucet_last_request_${principal.toString()}`, currentTime.toString());
+        // Ensure principal exists before using it
+        if (principal) {
+          localStorage.setItem(`faucet_last_request_${principal.toString()}`, currentTime.toString());
+          console.log('Faucet: Stored localStorage key:', `faucet_last_request_${principal.toString()}`);
+        }
         
         toast.success('🎉 Successfully received 100 USDX test tokens!', {
           duration: 4000,
           icon: '🪙',
         });
+        
+        console.log('Faucet: Before refreshAuth call');
+        // Refresh authentication state to ensure it persists
+        await refreshAuth();
+        console.log('Faucet: After refreshAuth call');
         
         // Notify parent component to refresh balance
         if (onTokensReceived) {
