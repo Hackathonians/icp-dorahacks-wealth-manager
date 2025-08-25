@@ -1,6 +1,10 @@
 # USDX Vault App
 
 A decentralized token vault and dividend distribution system built on the Internet Computer Protocol (ICP) using Motoko and React.
+## Fetch-ai Agent
+- Name: USDX-Vault-Agent
+- Address: test-agent://agent1qtxg5zw949un6ewdahwucqwts4d39h6gz5d0hl8xeztcvpdf65ggjs25mdp
+![tag:innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3)
 
 ## Features
 
@@ -63,6 +67,7 @@ src/vault_app0_frontend/
 │       └── AdminPanel.jsx         # Admin controls
 └── public/
 ```
+
 
 ## Getting Started
 

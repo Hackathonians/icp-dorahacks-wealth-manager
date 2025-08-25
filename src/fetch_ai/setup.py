@@ -412,8 +412,7 @@ Always be friendly, helpful, and clear in your responses."""
 agent = Agent(
     name='test-ICP-agent',
     port=8001,
-    mailbox=True,
-    endpoint=["http://localhost:8001"]
+    mailbox=True
 )
 chat_proto = Protocol(spec=chat_protocol_spec)
 
