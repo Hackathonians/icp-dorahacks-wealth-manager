@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { CurrencyDollarIcon, ArrowPathIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import TestTokenFaucet from './TestTokenFaucet';
 
 const TokenBalance = ({ onRefresh }) => {
   const { actor, principal } = useAuth();
@@ -48,6 +49,13 @@ const TokenBalance = ({ onRefresh }) => {
 
   const formatTokenAmount = (amount, decimals = 6) => {
     return (amount / Math.pow(10, decimals)).toFixed(2);
+  };
+
+  const handleTokensReceived = () => {
+    loadBalance();
+    if (onRefresh) {
+      onRefresh();
+    }
   };
 
   return (
@@ -106,11 +114,14 @@ const TokenBalance = ({ onRefresh }) => {
               <div>
                 <h4 className="text-white font-medium mb-1">Need tokens?</h4>
                 <p className="text-white text-opacity-80 text-sm">
-                  Contact the admin to receive USDX tokens for testing the vault system.
+                  Use the test token faucet below or contact the admin to receive USDX tokens for testing.
                 </p>
               </div>
             </div>
           </div>
+
+          {/* Test Token Faucet - Only show for hackathon testing */}
+          <TestTokenFaucet onTokensReceived={handleTokensReceived} />
         </div>
       )}
     </div>

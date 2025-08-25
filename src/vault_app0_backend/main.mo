@@ -54,6 +54,11 @@ persistent actor VaultApp {
   private var yield_distribution_counter : Nat = 0; // Counter for yield distributions
   private var _strategy_counter : Nat = 0; // Counter for investment strategies
 
+  // Test token faucet state
+  private transient var faucet_last_request = HashMap.HashMap<Principal, Int>(10, Principal.equal, Principal.hash);
+  private let faucet_amount : Nat = 100_000_000; // 100 USDX (with 6 decimals)
+  private let faucet_cooldown_nanoseconds : Int = 3600_000_000_000; // 1 hour in nanoseconds
+
   // Helper functions
   private func accountEqual(a1 : Types.Account, a2 : Types.Account) : Bool {
     if (not Principal.equal(a1.owner, a2.owner)) {
@@ -631,6 +636,47 @@ persistent actor VaultApp {
 
     let tx_id = nextTxId();
 
+    #ok(tx_id);
+  };
+
+  // Test token faucet - allows users to get test tokens for hackathon demo
+  public shared (msg) func faucet_get_test_tokens() : async Result.Result<Nat, Text> {
+    let caller = msg.caller;
+    let now = Time.now();
+    
+    // Check cooldown period
+    switch (faucet_last_request.get(caller)) {
+      case (?last_request_time) {
+        let time_since_last = now - last_request_time;
+        if (time_since_last < faucet_cooldown_nanoseconds) {
+          let remaining_nanoseconds = faucet_cooldown_nanoseconds - time_since_last;
+          let remaining_seconds = if (remaining_nanoseconds > 0) {
+            remaining_nanoseconds / 1_000_000_000
+          } else {
+            0
+          };
+          return #err("Faucet cooldown active. Try again in " # Int.toText(remaining_seconds) # " seconds");
+        };
+      };
+      case null { /* First time user, proceed */ };
+    };
+    
+    // Check admin balance
+    let admin_balance = getBalance(admin_account);
+    if (admin_balance < faucet_amount) {
+      return #err("Faucet temporarily unavailable - insufficient admin balance");
+    };
+    
+    // Transfer test tokens
+    let user_account : Types.Account = { owner = caller; subaccount = null };
+    setBalance(admin_account, admin_balance - faucet_amount);
+    let user_balance = getBalance(user_account);
+    setBalance(user_account, user_balance + faucet_amount);
+    
+    // Update cooldown
+    faucet_last_request.put(caller, now);
+    
+    let tx_id = nextTxId();
     #ok(tx_id);
   };
 
