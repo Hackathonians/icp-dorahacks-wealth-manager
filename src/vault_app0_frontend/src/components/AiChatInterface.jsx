@@ -7,8 +7,10 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import aiChatService from '../services/aiChatService';
+import { useAuth } from '../contexts/AuthContext';
 
 const AiChatInterface = ({ isOpen, onClose }) => {
+  const { principal, isAuthenticated } = useAuth();
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -54,8 +56,9 @@ const AiChatInterface = ({ isOpen, onClose }) => {
     setIsLoading(true);
 
     try {
-      // Call the AI chat service
-      const response = await aiChatService.sendMessage(currentMessage);
+      // Call the AI chat service with user principal if authenticated
+      const userPrincipal = isAuthenticated && principal ? principal.toString() : null;
+      const response = await aiChatService.sendMessage(currentMessage, userPrincipal);
       
       const aiMessage = {
         id: Date.now() + 1,

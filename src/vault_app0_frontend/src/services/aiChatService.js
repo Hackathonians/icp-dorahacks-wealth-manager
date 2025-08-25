@@ -18,9 +18,10 @@ class AiChatService {
   /**
    * Send a message to the AI agent
    * @param {string} message - The user's message
+   * @param {string|null} userPrincipal - The user's principal (optional)
    * @returns {Promise<string>} - The AI's response
    */
-  async sendMessage(message) {
+  async sendMessage(message, userPrincipal = null) {
     try {
       if (this.mockMode) {
         // Mock responses for demonstration
@@ -28,7 +29,7 @@ class AiChatService {
         return response;
       } else {
         // Real agent communication would go here
-        const response = await this.makeRealRequest(message);
+        const response = await this.makeRealRequest(message, userPrincipal);
         return response;
       }
     } catch (error) {
@@ -40,7 +41,7 @@ class AiChatService {
   /**
    * Make a real request to the Fetch.AI agent directly
    */
-  async makeRealRequest(message) {
+  async makeRealRequest(message, userPrincipal) {
     try {
       const response = await fetch('http://localhost:8001/api/chat', {
         method: 'POST',
@@ -49,7 +50,8 @@ class AiChatService {
         },
         body: JSON.stringify({
           message: message,
-          session_id: this.sessionId
+          session_id: this.sessionId,
+          user_principal: userPrincipal
         })
       });
 
