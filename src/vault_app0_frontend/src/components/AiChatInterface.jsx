@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   XMarkIcon, 
   PaperAirplaneIcon, 
-  ChatBubbleLeftRightIcon,
-  SparklesIcon 
+  SparklesIcon,
+  TrashIcon 
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import aiChatService from '../services/aiChatService';
@@ -13,7 +13,7 @@ const AiChatInterface = ({ isOpen, onClose }) => {
     {
       id: 1,
       type: 'ai',
-      content: 'Hello! I\'m your AI assistant for USDX vault operations and investment management. You can ask me about your portfolio, vault information, investment products, dividends, and more!',
+      content: 'Hello! I\'m your AI assistant for USDX vault operations and investment management. You can ask me about your portfolio, vault information, investment products, dividends, and more!\n\n🧠 I have persistent memory - I remember our conversation! Use the trash icon 🗑️ or type `/clear` to start fresh.',
       timestamp: new Date()
     }
   ]);
@@ -98,13 +98,40 @@ const AiChatInterface = ({ isOpen, onClose }) => {
     "Show me all available investment products",
     "What investment instruments are available with their APY rates?",
     "How do dividends work in this system?",
-    "What's my USDX token balance?",
-    "Show me my current vault investments"
+    "/clear",
+    "What functions can you help me with?"
   ];
 
   const handleSuggestedQuery = (query) => {
     setInputMessage(query);
     inputRef.current?.focus();
+  };
+
+  const clearMemory = async () => {
+    try {
+      setIsLoading(true);
+      const success = await aiChatService.clearMemory();
+      
+      if (success) {
+        // Clear local messages and add a fresh welcome message
+        setMessages([
+          {
+            id: Date.now(),
+            type: 'ai',
+            content: '🧠 Memory cleared! I\'ve started a fresh conversation. How can I help you today?',
+            timestamp: new Date()
+          }
+        ]);
+        toast.success('Conversation memory cleared');
+      } else {
+        toast.error('Failed to clear memory');
+      }
+    } catch (error) {
+      console.error('Error clearing memory:', error);
+      toast.error('Error clearing conversation memory');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -130,12 +157,22 @@ const AiChatInterface = ({ isOpen, onClose }) => {
               <p className="text-sm text-gray-400">USDX Vault & Investment Management</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-gray-800"
-          >
-            <XMarkIcon className="w-5 h-5" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={clearMemory}
+              disabled={isLoading}
+              className="text-gray-400 hover:text-red-400 transition-colors p-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Clear conversation memory"
+            >
+              <TrashIcon className="w-5 h-5" />
+            </button>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-gray-800"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -207,7 +244,7 @@ const AiChatInterface = ({ isOpen, onClose }) => {
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Ask me about vault operations, investments, dividends, or anything else..."
+                placeholder="Ask me about vault operations, investments, dividends... Type '/clear' to reset memory."
                 rows={1}
                 className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 style={{
@@ -228,9 +265,14 @@ const AiChatInterface = ({ isOpen, onClose }) => {
               <PaperAirplaneIcon className="w-5 h-5" />
             </button>
           </div>
-          <p className="text-xs text-gray-500 mt-2">
-            Press Enter to send, Shift+Enter for new line
-          </p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-gray-500">
+              Press Enter to send, Shift+Enter for new line
+            </p>
+            <p className="text-xs text-gray-500 flex items-center">
+              🧠 Memory: Active • Session: {aiChatService.getSessionId().slice(-8)}
+            </p>
+          </div>
         </div>
       </div>
     </div>

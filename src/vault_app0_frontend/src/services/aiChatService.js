@@ -4,6 +4,15 @@ class AiChatService {
     // Since the Fetch.AI agent uses uagents protocol, we'll simulate the communication
     // In production, you would set up a proper WebSocket or HTTP bridge to the agent
     this.mockMode = false; // Set to false when you have the agent bridge ready
+    this.sessionId = this.generateSessionId();
+  }
+
+  /**
+   * Generate a unique session ID for the user
+   * @returns {string} - Unique session ID
+   */
+  generateSessionId() {
+    return `web_session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   }
 
   /**
@@ -39,7 +48,8 @@ class AiChatService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: message
+          message: message,
+          session_id: this.sessionId
         })
       });
 
@@ -53,6 +63,44 @@ class AiChatService {
       console.warn('Fetch.AI agent not available, falling back to mock:', error);
       // Fall back to mock if agent is not running
       return await this.makeMockRequest(message);
+    }
+  }
+
+  /**
+   * Clear conversation memory
+   * @returns {Promise<boolean>} - Success status
+   */
+  async clearMemory() {
+    try {
+      if (this.mockMode) {
+        // For mock mode, just generate a new session ID
+        this.sessionId = this.generateSessionId();
+        return true;
+      } else {
+        const response = await fetch('http://localhost:8001/api/clear-memory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            session_id: this.sessionId
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Clear memory error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        // Generate new session ID after clearing memory
+        this.sessionId = this.generateSessionId();
+        return data.success;
+      }
+    } catch (error) {
+      console.error('Error clearing memory:', error);
+      // Fallback: generate new session ID
+      this.sessionId = this.generateSessionId();
+      return false;
     }
   }
 
@@ -114,6 +162,23 @@ class AiChatService {
    */
   setMode(mockMode) {
     this.mockMode = mockMode;
+  }
+
+  /**
+   * Get current session ID
+   * @returns {string} - Current session ID
+   */
+  getSessionId() {
+    return this.sessionId;
+  }
+
+  /**
+   * Start a new session (generates new session ID)
+   * @returns {string} - New session ID
+   */
+  startNewSession() {
+    this.sessionId = this.generateSessionId();
+    return this.sessionId;
   }
 
   /**

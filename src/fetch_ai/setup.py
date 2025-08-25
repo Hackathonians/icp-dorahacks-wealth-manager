@@ -19,9 +19,19 @@ load_dotenv()
 # Request and Response Models for REST endpoints
 class ChatRequest(Model):
     message: str
+    session_id: str = "web_session"
 
 class ChatResponse(Model):
     response: str
+    timestamp: str
+    session_id: str
+
+class ClearMemoryRequest(Model):
+    session_id: str = "web_session"
+
+class ClearMemoryResponse(Model):
+    success: bool
+    message: str
     timestamp: str
 
 class HealthResponse(Model):
@@ -38,8 +48,15 @@ class InfoResponse(Model):
 # ASI1 API settings
 ASI1_API_KEY = os.getenv("ASI1_API_KEY")
 ASI1_BASE_URL = "https://api.asi1.ai/v1"
+
+if not ASI1_API_KEY:
+    print("⚠️  WARNING: ASI1_API_KEY not found in environment variables!")
+    print("   Please add your ASI1 API key to the .env file:")
+    print("   ASI1_API_KEY=your_api_key_here")
+    print("   The agent will return helpful error messages until configured.")
+
 ASI1_HEADERS = {
-    "Authorization": f"Bearer {ASI1_API_KEY}",
+    "Authorization": f"Bearer {ASI1_API_KEY}" if ASI1_API_KEY else "Bearer missing_key",
     "Content-Type": "application/json"
 }
 
@@ -267,6 +284,50 @@ async def call_icp_endpoint(func_name: str, args: dict):
 # Global variable to store admin principals for session-based auth
 USER_ADMIN_STATUS = {}
 
+# Memory management for conversation context
+CONVERSATION_MEMORY = {}
+MAX_MEMORY_MESSAGES = 50  # Maximum messages to keep in memory per session
+
+def get_session_id(sender: str) -> str:
+    """Generate a consistent session ID from sender address."""
+    return f"session_{sender}"
+
+def add_to_memory(session_id: str, role: str, content: str, ctx: Context):
+    """Add a message to conversation memory."""
+    if session_id not in CONVERSATION_MEMORY:
+        CONVERSATION_MEMORY[session_id] = []
+    
+    CONVERSATION_MEMORY[session_id].append({
+        "role": role,
+        "content": content,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Limit memory size
+    if len(CONVERSATION_MEMORY[session_id]) > MAX_MEMORY_MESSAGES:
+        CONVERSATION_MEMORY[session_id] = CONVERSATION_MEMORY[session_id][-MAX_MEMORY_MESSAGES:]
+    
+    ctx.logger.info(f"Added to memory for {session_id}: {role} message")
+
+def get_conversation_history(session_id: str, limit: int = 10) -> list:
+    """Get recent conversation history for context."""
+    if session_id not in CONVERSATION_MEMORY:
+        return []
+    
+    return CONVERSATION_MEMORY[session_id][-limit:] if limit else CONVERSATION_MEMORY[session_id]
+
+def clear_memory(session_id: str, ctx: Context) -> bool:
+    """Clear conversation memory for a session."""
+    try:
+        if session_id in CONVERSATION_MEMORY:
+            del CONVERSATION_MEMORY[session_id]
+            ctx.logger.info(f"Cleared memory for session {session_id}")
+            return True
+        return False
+    except Exception as e:
+        ctx.logger.error(f"Error clearing memory for {session_id}: {str(e)}")
+        return False
+
 async def check_user_admin_status(user_principal: str, ctx: Context) -> bool:
     """Check if a user has admin privileges and cache the result."""
     try:
@@ -288,9 +349,35 @@ async def check_user_admin_status(user_principal: str, ctx: Context) -> bool:
         ctx.logger.error(f"Error checking admin status for {user_principal}: {str(e)}")
         return False
 
-async def process_query(query: str, ctx: Context) -> str:
+async def process_query(query: str, ctx: Context, session_id: str = "default") -> str:
     try:
-        # Step 1: Initial call to ASI1 with user query and tools
+        # Check for missing API key
+        if not ASI1_API_KEY or ASI1_API_KEY == "your_asi1_api_key_here":
+            return """🔑 **API Configuration Required**
+
+I need an ASI1 API key to function properly. Please:
+
+1. Get an API key from https://api.asi1.ai/
+2. Add it to your `.env` file:
+   ```
+   ASI1_API_KEY=your_actual_api_key
+   ```
+3. Restart the agent
+
+Until then, I can help with general information about the vault system, but I won't be able to fetch real data or use advanced AI features."""
+
+        # Check for memory management commands
+        if query.strip().lower() in ['/clear', '/clear memory', '/reset', '/new session']:
+            clear_memory(session_id, ctx)
+            return "🧠 Memory cleared! Starting a fresh conversation. How can I help you?"
+        
+        # Add user message to memory
+        add_to_memory(session_id, "user", query, ctx)
+        
+        # Get conversation history for context
+        conversation_history = get_conversation_history(session_id, limit=10)
+        
+        # Step 1: Initial call to ASI1 with user query, tools, and conversation history
         system_message = {
             "role": "system",
             "content": """You are a helpful AI assistant for an ICP vault system that manages USDX token investments. 
@@ -303,16 +390,34 @@ You can help users with:
 When users ask for specific data, use the available tools to fetch real information from the vault system.
 When users ask general questions or need help understanding the system, provide helpful explanations without using tools.
 
+You have access to previous conversation history to maintain context. Reference past interactions when relevant to provide better, more personalized responses.
+
+Special commands:
+- '/clear', '/clear memory', '/reset', or '/new session' - Clear conversation memory
+
 Always be friendly, helpful, and clear in your responses."""
         }
         
+        # Build messages with conversation history
+        messages = [system_message]
+        
+        # Add conversation history (excluding system messages to avoid duplication)
+        for msg in conversation_history[:-1]:  # Exclude the last message (current query) as it's added separately
+            if msg["role"] != "system":
+                messages.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+        
+        # Add current user message
         initial_message = {
             "role": "user",
             "content": query
         }
+        messages.append(initial_message)
         payload = {
             "model": "asi1-mini",
-            "messages": [system_message, initial_message],
+            "messages": messages,
             "tools": tools,
             "temperature": 0.7,
             "max_tokens": 1024
@@ -322,16 +427,30 @@ Always be friendly, helpful, and clear in your responses."""
             headers=ASI1_HEADERS,
             json=payload
         )
+        
+        if response.status_code == 401:
+            ctx.logger.error("ASI1 API authentication failed - check API key")
+            return "🔑 **Authentication Error**: Invalid or missing ASI1 API key. Please check your API key configuration in the .env file."
+        elif response.status_code == 403:
+            ctx.logger.error("ASI1 API access forbidden")
+            return "🚫 **Access Denied**: Your API key doesn't have access to this service. Please check your ASI1 subscription."
+        elif response.status_code == 429:
+            ctx.logger.error("ASI1 API rate limit exceeded")
+            return "⏳ **Rate Limited**: Too many requests. Please wait a moment and try again."
+        
         response.raise_for_status()
         response_json = response.json()
 
         # Step 2: Parse tool calls from response
         tool_calls = response_json["choices"][0]["message"].get("tool_calls", [])
-        messages_history = [system_message, initial_message, response_json["choices"][0]["message"]]
+        messages_history = messages + [response_json["choices"][0]["message"]]
 
         if not tool_calls:
             # Handle general questions without tool calls - let AI respond naturally
-            return response_json["choices"][0]["message"]["content"]
+            ai_response = response_json["choices"][0]["message"]["content"]
+            # Add AI response to memory
+            add_to_memory(session_id, "assistant", ai_response, ctx)
+            return ai_response
 
         # Step 3: Execute tools and format results
         for tool_call in tool_calls:
@@ -399,11 +518,22 @@ Always be friendly, helpful, and clear in your responses."""
             headers=ASI1_HEADERS,
             json=final_payload
         )
+        
+        if final_response.status_code == 401:
+            ctx.logger.error("ASI1 API authentication failed on final call")
+            return "🔑 **Authentication Error**: API key issue during final processing. Please check your configuration."
+        elif final_response.status_code == 429:
+            ctx.logger.error("ASI1 API rate limit exceeded on final call")
+            return "⏳ **Rate Limited**: Please wait a moment and try again."
+            
         final_response.raise_for_status()
         final_response_json = final_response.json()
 
         # Step 5: Return the model's final answer
-        return final_response_json["choices"][0]["message"]["content"]
+        final_ai_response = final_response_json["choices"][0]["message"]["content"]
+        # Add final AI response to memory
+        add_to_memory(session_id, "assistant", final_ai_response, ctx)
+        return final_ai_response
 
     except Exception as e:
         ctx.logger.error(f"Error processing query: {str(e)}")
@@ -419,6 +549,8 @@ chat_proto = Protocol(spec=chat_protocol_spec)
 @chat_proto.on_message(model=ChatMessage)
 async def handle_chat_message(ctx: Context, sender: str, msg: ChatMessage):
     try:
+        session_id = get_session_id(sender)
+        
         ack = ChatAcknowledgement(
             timestamp=datetime.now(timezone.utc),
             acknowledged_msg_id=msg.msg_id
@@ -431,7 +563,7 @@ async def handle_chat_message(ctx: Context, sender: str, msg: ChatMessage):
                 continue
             elif isinstance(item, TextContent):
                 ctx.logger.info(f"Got a message from {sender}: {item.text}")
-                response_text = await process_query(item.text, ctx)
+                response_text = await process_query(item.text, ctx, session_id)
                 ctx.logger.info(f"Response text: {response_text}")
                 response = ChatMessage(
                     timestamp=datetime.now(timezone.utc),
@@ -463,16 +595,37 @@ agent.include(chat_proto)
 async def handle_chat_rest(ctx: Context, req: ChatRequest) -> ChatResponse:
     """REST endpoint for frontend chat interface"""
     try:
-        ctx.logger.info(f"Received REST chat message: {req.message}")
-        response_text = await process_query(req.message, ctx)
+        ctx.logger.info(f"Received REST chat message: {req.message} (session: {req.session_id})")
+        response_text = await process_query(req.message, ctx, req.session_id)
         return ChatResponse(
             response=response_text,
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
+            session_id=req.session_id
         )
     except Exception as e:
         ctx.logger.error(f"Error in REST chat endpoint: {e}")
         return ChatResponse(
             response=f"An error occurred: {str(e)}",
+            timestamp=datetime.now().isoformat(),
+            session_id=req.session_id
+        )
+
+@agent.on_rest_post("/api/clear-memory", ClearMemoryRequest, ClearMemoryResponse)
+async def handle_clear_memory_rest(ctx: Context, req: ClearMemoryRequest) -> ClearMemoryResponse:
+    """REST endpoint to clear conversation memory"""
+    try:
+        ctx.logger.info(f"Clearing memory for session: {req.session_id}")
+        success = clear_memory(req.session_id, ctx)
+        return ClearMemoryResponse(
+            success=success,
+            message="Memory cleared successfully" if success else "No memory found for session",
+            timestamp=datetime.now().isoformat()
+        )
+    except Exception as e:
+        ctx.logger.error(f"Error in clear memory endpoint: {e}")
+        return ClearMemoryResponse(
+            success=False,
+            message=f"Error clearing memory: {str(e)}",
             timestamp=datetime.now().isoformat()
         )
 
@@ -491,13 +644,14 @@ async def handle_info(ctx: Context) -> InfoResponse:
     return InfoResponse(
         name="Fetch.AI ICP Vault Agent",
         port=8001,
-        endpoints=["/api/chat", "/health", "/"],
-        description="AI agent for ICP vault operations and investment management. Supports user portfolio tracking, admin functions, and comprehensive investment reporting."
+        endpoints=["/api/chat", "/api/clear-memory", "/health", "/"],
+        description="AI agent for ICP vault operations and investment management. Supports user portfolio tracking, admin functions, comprehensive investment reporting, and persistent conversation memory."
     )
 
 if __name__ == "__main__":
     print("Starting Fetch.AI ICP Vault Agent with integrated REST endpoints on port 8001...")
     print("Chat endpoint: http://localhost:8001/api/chat")
+    print("Clear memory endpoint: http://localhost:8001/api/clear-memory")
     print("Health endpoint: http://localhost:8001/health")
     print("Info endpoint: http://localhost:8001/")
     print("")
@@ -505,6 +659,7 @@ if __name__ == "__main__":
     print("📊 Vault Operations: get_vault_info, get_active_products, get_investment_instruments")
     print("💰 User Portfolio: get_user_balance, get_user_vault_entries, get_user_investment_report, get_unclaimed_dividends")
     print("👑 Admin Functions: check_admin_status, get_admin_investment_report (requires admin privileges)")
+    print("🧠 Memory Commands: /clear, /clear memory, /reset, /new session")
     print("")
     agent.run()
 
