@@ -47,13 +47,11 @@ export const AuthProvider = ({ children }) => {
 
       // Single check with proper error handling
       const isAuthenticated = await client.isAuthenticated();
-      console.log('Auth initialization - isAuthenticated:', isAuthenticated);
       
       setIsAuthenticated(isAuthenticated);
 
       if (isAuthenticated) {
         const identity = client.getIdentity();
-        console.log('Auth initialization - identity:', identity.getPrincipal().toString());
         setIdentity(identity);
         setPrincipal(identity.getPrincipal());
         await createActor(identity);
@@ -93,8 +91,6 @@ export const AuthProvider = ({ children }) => {
       const identityProvider = process.env.DFX_NETWORK === 'ic' 
       ? 'https://identity.ic0.app' // Mainnet
       : 'http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943'; // Local
-
-      console.log('identityProvider', identityProvider);
       await authClient.login({
         identityProvider,
         // Set a longer session timeout (8 hours)
@@ -135,26 +131,14 @@ export const AuthProvider = ({ children }) => {
     
     try {
       const isAuthenticated = await authClient.isAuthenticated();
-      console.log('Auth refresh - isAuthenticated:', isAuthenticated);
-      
-      // Debug: Check stored keys again during refresh
-      if (typeof window !== 'undefined') {
-        const storedKeys = Object.keys(localStorage).filter(key => 
-          key.includes('ic-') || key.includes('identity') || key.includes('auth')
-        );
-        console.log('Auth refresh - stored keys:', storedKeys);
-      }
       
       if (isAuthenticated) {
         const identity = authClient.getIdentity();
-        console.log('Auth refresh - identity:', identity.getPrincipal().toString());
-        console.log('Auth refresh - identity delegations:', identity.getDelegation?.());
         setIdentity(identity);
         setPrincipal(identity.getPrincipal());
         setIsAuthenticated(true);
         await createActor(identity);
       } else {
-        console.log('Auth refresh - not authenticated, clearing state');
         setIsAuthenticated(false);
         setIdentity(null);
         setPrincipal(null);

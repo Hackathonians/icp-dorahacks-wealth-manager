@@ -53,10 +53,8 @@ const TestTokenFaucet = ({ onTokensReceived }) => {
 
     try {
       setLoading(true);
-      console.log('Faucet: Before token request - principal:', principal.toString());
       
       const result = await actor.faucet_get_test_tokens();
-      console.log('Faucet: Token request result:', result);
 
       if ('ok' in result) {
         const currentTime = Date.now();
@@ -64,7 +62,6 @@ const TestTokenFaucet = ({ onTokensReceived }) => {
         // Ensure principal exists before using it
         if (principal) {
           localStorage.setItem(`faucet_last_request_${principal.toString()}`, currentTime.toString());
-          console.log('Faucet: Stored localStorage key:', `faucet_last_request_${principal.toString()}`);
         }
         
         toast.success('🎉 Successfully received 100 USDX test tokens!', {
@@ -72,10 +69,8 @@ const TestTokenFaucet = ({ onTokensReceived }) => {
           icon: '🪙',
         });
         
-        console.log('Faucet: Before refreshAuth call');
         // Refresh authentication state to ensure it persists
         await refreshAuth();
-        console.log('Faucet: After refreshAuth call');
         
         // Notify parent component to refresh balance
         if (onTokensReceived) {

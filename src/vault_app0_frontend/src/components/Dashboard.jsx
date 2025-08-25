@@ -40,9 +40,6 @@ const Dashboard = () => {
       
       // Load vault info
       const vaultInfoResult = await actor.get_vault_info();
-      console.log('principal', principal.toString());
-      console.log('vaultInfoResult', vaultInfoResult);
-      console.log('vaultInfoResult.admin', vaultInfoResult.admin.toString());
       setVaultInfo(vaultInfoResult);
       
       // Check if user is admin (check against all admins)
@@ -54,7 +51,6 @@ const Dashboard = () => {
       
       // Load user vault entries
       const userVaultResult = await actor.get_user_vault_entries(principal);
-      console.log('userVaultResult', userVaultResult);
       setUserVaultEntries(userVaultResult || []);
       
     } catch (error) {

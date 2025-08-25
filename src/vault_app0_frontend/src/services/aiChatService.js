@@ -154,7 +154,6 @@ class AiChatService {
   async autoDetectMode() {
     const agentAvailable = await this.checkFetchAIAgent();
     this.mockMode = !agentAvailable;
-    console.log(`AI Chat Service mode: ${this.mockMode ? 'Mock' : 'Real'} (Fetch.AI agent ${agentAvailable ? 'available' : 'not available'})`);
     return !this.mockMode;
   }
 

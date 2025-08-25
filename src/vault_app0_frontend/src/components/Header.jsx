@@ -85,7 +85,6 @@ const Header = () => {
   const formatPrincipal = (principal) => {
     if (!principal) return '';
     const str = principal.toString();
-    console.log('str', str);
     return `${str.slice(0, 8)}...${str.slice(-8)}`;
   };
 
