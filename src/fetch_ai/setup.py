@@ -20,6 +20,7 @@ load_dotenv()
 class ChatRequest(Model):
     message: str
     session_id: str = "web_session"
+    user_principal: str = None
 
 class ChatResponse(Model):
     response: str
@@ -349,7 +350,7 @@ async def check_user_admin_status(user_principal: str, ctx: Context) -> bool:
         ctx.logger.error(f"Error checking admin status for {user_principal}: {str(e)}")
         return False
 
-async def process_query(query: str, ctx: Context, session_id: str = "default") -> str:
+async def process_query(query: str, ctx: Context, session_id: str = "default", user_principal: str = None) -> str:
     try:
         # Check for missing API key
         if not ASI1_API_KEY or ASI1_API_KEY == "your_asi1_api_key_here":
@@ -378,9 +379,13 @@ Until then, I can help with general information about the vault system, but I wo
         conversation_history = get_conversation_history(session_id, limit=10)
         
         # Step 1: Initial call to ASI1 with user query, tools, and conversation history
+        user_context = ""
+        if user_principal:
+            user_context = f"\n\nIMPORTANT: The user's principal ID is: {user_principal}. When they ask about 'my balance', 'my investments', or other personal queries, automatically use this principal ID to fetch their data without asking them to provide it."
+        
         system_message = {
             "role": "system",
-            "content": """You are a helpful AI assistant for an ICP vault system that manages USDX token investments. 
+            "content": f"""You are a helpful AI assistant for an ICP vault system that manages USDX token investments. 
             
 You can help users with:
 - 📊 Vault information (vault status, investment products, available instruments)
@@ -395,7 +400,7 @@ You have access to previous conversation history to maintain context. Reference 
 Special commands:
 - '/clear', '/clear memory', '/reset', or '/new session' - Clear conversation memory
 
-Always be friendly, helpful, and clear in your responses."""
+Always be friendly, helpful, and clear in your responses.{user_context}"""
         }
         
         # Build messages with conversation history
@@ -563,7 +568,7 @@ async def handle_chat_message(ctx: Context, sender: str, msg: ChatMessage):
                 continue
             elif isinstance(item, TextContent):
                 ctx.logger.info(f"Got a message from {sender}: {item.text}")
-                response_text = await process_query(item.text, ctx, session_id)
+                response_text = await process_query(item.text, ctx, session_id, None)
                 ctx.logger.info(f"Response text: {response_text}")
                 response = ChatMessage(
                     timestamp=datetime.now(timezone.utc),
@@ -596,7 +601,8 @@ async def handle_chat_rest(ctx: Context, req: ChatRequest) -> ChatResponse:
     """REST endpoint for frontend chat interface"""
     try:
         ctx.logger.info(f"Received REST chat message: {req.message} (session: {req.session_id})")
-        response_text = await process_query(req.message, ctx, req.session_id)
+        user_principal = req.user_principal
+        response_text = await process_query(req.message, ctx, req.session_id, user_principal)
         return ChatResponse(
             response=response_text,
             timestamp=datetime.now().isoformat(),
