@@ -393,6 +393,9 @@ async def call_icp_endpoint(func_name: str, args: dict):
 # Global variable to store admin principals for session-based auth
 USER_ADMIN_STATUS = {}
 
+# Storage for user principals associated with chat sessions
+CHAT_USER_PRINCIPALS = {}  # Maps session_id -> user_principal
+
 # Memory management for conversation context
 CONVERSATION_MEMORY = {}
 MAX_MEMORY_MESSAGES = 50  # Maximum messages to keep in memory per session
@@ -437,6 +440,45 @@ def clear_memory(session_id: str, ctx: Context) -> bool:
         ctx.logger.error(f"Error clearing memory for {session_id}: {str(e)}")
         return False
 
+def set_user_principal(session_id: str, user_principal: str, ctx: Context) -> bool:
+    """Set user principal for a chat session."""
+    try:
+        # Validate ICP principal format (basic validation)
+        if not user_principal or len(user_principal) < 10 or '-' not in user_principal:
+            ctx.logger.warning(f"Invalid principal format: {user_principal}")
+            return False
+        
+        CHAT_USER_PRINCIPALS[session_id] = user_principal
+        ctx.logger.info(f"Set principal for session {session_id}: {user_principal}")
+        return True
+    except Exception as e:
+        ctx.logger.error(f"Error setting principal for {session_id}: {str(e)}")
+        return False
+
+def get_user_principal(session_id: str) -> str:
+    """Get user principal for a chat session."""
+    return CHAT_USER_PRINCIPALS.get(session_id, None)
+
+def clear_user_principal(session_id: str, ctx: Context) -> bool:
+    """Clear user principal for a chat session."""
+    try:
+        if session_id in CHAT_USER_PRINCIPALS:
+            del CHAT_USER_PRINCIPALS[session_id]
+            ctx.logger.info(f"Cleared principal for session {session_id}")
+            return True
+        return False
+    except Exception as e:
+        ctx.logger.error(f"Error clearing principal for {session_id}: {str(e)}")
+        return False
+
+def extract_principal_from_message(message: str) -> str:
+    """Extract ICP principal from message if present."""
+    import re
+    # Look for ICP principal pattern: words separated by hyphens
+    principal_pattern = r'\b[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{3}\b'
+    match = re.search(principal_pattern, message)
+    return match.group(0) if match else None
+
 async def check_user_admin_status(user_principal: str, ctx: Context) -> bool:
     """Check if a user has admin privileges and cache the result."""
     try:
@@ -480,16 +522,51 @@ Until then, I can help with general information about the vault system, but I wo
             clear_memory(session_id, ctx)
             return "🧠 Memory cleared! Starting a fresh conversation. How can I help you?"
         
+        # Check for principal management commands (for debugging/manual override)
+        query_lower = query.strip().lower()
+        if query_lower.startswith('/set principal '):
+            principal = query[14:].strip()  # Remove '/set principal '
+            if set_user_principal(session_id, principal, ctx):
+                return f"✅ Principal set successfully! You can now ask about your personal portfolio data."
+            else:
+                return "❌ Invalid principal format. Please provide a valid ICP principal ID."
+        elif query_lower in ['/clear principal', '/remove principal']:
+            if clear_user_principal(session_id, ctx):
+                return "🗑️ Principal cleared! You'll now only see general information."
+            else:
+                return "ℹ️ No principal was set for this session."
+        elif query_lower in ['/show principal', '/my principal']:
+            stored_principal = get_user_principal(session_id)
+            if stored_principal:
+                return f"👤 Your current principal: {stored_principal}"
+            else:
+                return "ℹ️ No principal detected. The system will automatically use your authenticated principal when available."
+        
         # Add user message to memory
         add_to_memory(session_id, "user", query, ctx)
         
         # Get conversation history for context
         conversation_history = get_conversation_history(session_id, limit=10)
         
+        # Determine user principal - priority order:
+        # 1. Explicitly passed user_principal (from REST API)
+        # 2. Stored principal for the session
+        # 3. Extract from current message
+        final_user_principal = user_principal or get_user_principal(session_id)
+        
+        # Try to extract principal from message if not already set
+        if not final_user_principal:
+            extracted_principal = extract_principal_from_message(query)
+            if extracted_principal:
+                # Auto-set the principal for this session
+                set_user_principal(session_id, extracted_principal, ctx)
+                final_user_principal = extracted_principal
+                ctx.logger.info(f"Auto-extracted and set principal: {extracted_principal}")
+        
         # Step 1: Initial call to ASI1 with user query, tools, and conversation history
         user_context = ""
-        if user_principal:
-            user_context = f"\n\nIMPORTANT: The user's principal ID is: {user_principal}. When they ask about 'my balance', 'my investments', or other personal queries, automatically use this principal ID to fetch their data without asking them to provide it."
+        if final_user_principal:
+            user_context = f"\n\nIMPORTANT: The user's principal ID is: {final_user_principal}. When they ask about 'my balance', 'my investments', or other personal queries, automatically use this principal ID to fetch their data without asking them to provide it."
         
         system_message = {
             "role": "system",
@@ -507,6 +584,9 @@ You have access to previous conversation history to maintain context. Reference 
 
 Special commands:
 - '/clear', '/clear memory', '/reset', or '/new session' - Clear conversation memory
+- '/set principal <principal-id>' - Set your ICP principal for personalized queries
+- '/clear principal' or '/remove principal' - Remove your stored principal
+- '/show principal' or '/my principal' - Display your current stored principal
 
 Always be friendly, helpful, and clear in your responses.{user_context}"""
         }
@@ -677,8 +757,10 @@ async def handle_chat_message(ctx: Context, sender: str, msg: ChatMessage):
                 continue
             elif isinstance(item, TextContent):
                 ctx.logger.info(f"Got a message from {sender}: {item.text}")
+                # Get stored user principal for this session
+                user_principal = get_user_principal(session_id)
                 response_text = await asyncio.wait_for(
-                    process_query(item.text, ctx, session_id, None),
+                    process_query(item.text, ctx, session_id, user_principal),
                     timeout=500)
                 ctx.logger.info(f"Response text: {response_text}")
                 response = ChatMessage(
@@ -713,6 +795,12 @@ async def handle_chat_rest(ctx: Context, req: ChatRequest) -> ChatResponse:
     try:
         ctx.logger.info(f"Received REST chat message: {req.message} (session: {req.session_id})")
         user_principal = req.user_principal
+        
+        # Automatically store user principal for this session if provided and not already set
+        if user_principal and not get_user_principal(req.session_id):
+            set_user_principal(req.session_id, user_principal, ctx)
+            ctx.logger.info(f"Auto-stored user principal for session {req.session_id}: {user_principal}")
+        
         response_text = await asyncio.wait_for(
             process_query(req.message, ctx, req.session_id, user_principal),
             timeout=500)
@@ -779,6 +867,7 @@ if __name__ == "__main__":
     print("💰 User Portfolio: get_user_balance, get_user_vault_entries, get_user_investment_report, get_unclaimed_dividends")
     print("👑 Admin Functions: check_admin_status, get_admin_investment_report (requires admin privileges)")
     print("🧠 Memory Commands: /clear, /clear memory, /reset, /new session")
+    print("👤 Principal Commands: /set principal <id>, /clear principal, /show principal")
     print("")
     agent.run()
 
