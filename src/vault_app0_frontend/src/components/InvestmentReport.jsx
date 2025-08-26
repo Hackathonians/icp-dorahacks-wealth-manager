@@ -118,24 +118,24 @@ const InvestmentReport = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Investment Report</h2>
-        <p className="text-gray-600">Please connect your wallet to view your investment report.</p>
+      <div className="card">
+        <h2 className="text-2xl font-bold text-slate-900 mb-4">Investment Report</h2>
+        <p className="text-slate-700">Please connect your wallet to view your investment report.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="card">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Investment Report</h2>
+        <h2 className="text-2xl font-bold text-slate-900">Investment Report</h2>
         <div className="flex space-x-2">
           <button
             onClick={() => setSelectedTab('user')}
-            className={`px-4 py-2 rounded-lg font-medium ${
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               selectedTab === 'user'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                ? 'bg-orange-500 text-white'
+                : 'bg-white/80 text-slate-700 hover:bg-white border border-slate-200'
             }`}
           >
             My Investments
@@ -146,10 +146,10 @@ const InvestmentReport = () => {
                 setSelectedTab('admin');
                 if (!adminReport) loadAdminReport();
               }}
-              className={`px-4 py-2 rounded-lg font-medium ${
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 selectedTab === 'admin'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-white/80 text-slate-700 hover:bg-white border border-slate-200'
               }`}
             >
               Admin Dashboard
@@ -159,14 +159,14 @@ const InvestmentReport = () => {
       </div>
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-4">
           {error}
         </div>
       )}
 
       {loading && (
         <div className="flex justify-center items-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
         </div>
       )}
 
