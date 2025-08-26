@@ -99,12 +99,12 @@ const TestTokenFaucet = ({ onTokensReceived }) => {
         </div>
         <div className="flex-1">
           <div className="flex items-center space-x-2 mb-2">
-            <h4 className="text-white font-medium">Test Token Faucet</h4>
+            <h4 className="text-black font-medium">Test Token Faucet</h4>
             <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
               HACKATHON
             </span>
           </div>
-          <p className="text-white text-opacity-80 text-sm mb-4">
+          <p className="text-black text-sm mb-4">
             Get 100 USDX test tokens to try out the vault and dividend features. 
             Available once per hour for testing purposes.
           </p>
@@ -112,10 +112,10 @@ const TestTokenFaucet = ({ onTokensReceived }) => {
           {isOnCooldown ? (
             <div className="bg-orange-500 bg-opacity-20 rounded-lg p-3 border border-orange-400 border-opacity-30">
               <div className="flex items-center space-x-2">
-                <ClockIcon className="w-5 h-5 text-orange-400" />
+                <ClockIcon className="w-5 h-5 text-red-400" />
                 <div>
-                  <p className="text-orange-300 text-sm font-medium">Cooldown Active</p>
-                  <p className="text-orange-200 text-xs">
+                  <p className="text-red-600 text-sm font-medium">Cooldown Active</p>
+                  <p className="text-black text-xs">
                     Next request available in: {formatCooldownTime(cooldownRemaining)}
                   </p>
                 </div>
@@ -141,7 +141,7 @@ const TestTokenFaucet = ({ onTokensReceived }) => {
             </button>
           )}
           
-          <div className="mt-3 text-xs text-white text-opacity-60">
+          <div className="mt-3 text-xs text-black text-opacity-60">
             <p>💡 Perfect for testing vault locking and dividend claiming features</p>
             <p>🔒 One request per hour per user - managed by smart contract</p>
           </div>
