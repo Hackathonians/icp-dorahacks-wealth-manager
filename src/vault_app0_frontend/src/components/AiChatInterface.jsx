@@ -97,7 +97,8 @@ const AiChatInterface = ({ isOpen, onClose }) => {
   };
 
   const suggestedQueries = [
-    "What's the current vault status?",
+    "What's the current vault balance?",
+    "Recommend me the next investment asset given the market trend and my asset portfolio",
     "Show me all available investment products",
     "What investment instruments are available with their APY rates?",
     "How do dividends work in this system?",
@@ -225,7 +226,7 @@ const AiChatInterface = ({ isOpen, onClose }) => {
           <div className="px-4 py-2 border-t border-gray-700">
             <p className="text-sm text-gray-400 mb-2">Try asking:</p>
             <div className="flex flex-wrap gap-2">
-              {suggestedQueries.slice(0, 3).map((query, index) => (
+              {suggestedQueries.map((query, index) => (
                 <button
                   key={index}
                   onClick={() => handleSuggestedQuery(query)}
