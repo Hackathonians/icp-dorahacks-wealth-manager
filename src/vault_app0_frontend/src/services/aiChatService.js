@@ -5,6 +5,12 @@ class AiChatService {
     // In production, you would set up a proper WebSocket or HTTP bridge to the agent
     this.mockMode = false; // Set to false when you have the agent bridge ready
     this.sessionId = this.generateSessionId();
+    this.AGENT_URL = typeof process !== 'undefined' && process.env && process.env.AGENT_URL
+      ? process.env.AGENT_URL
+      : (import.meta && import.meta.env && import.meta.env.VITE_AGENT_URL)
+        ? import.meta.env.VITE_AGENT_URL
+        : 'http://localhost:8001';
+    console.log('AI Chat Service initialized in', this.mockMode ? 'mock' : 'real', 'mode. Agent URL:', this.AGENT_URL);
   }
 
   /**
@@ -43,7 +49,7 @@ class AiChatService {
    */
   async makeRealRequest(message, userPrincipal) {
     try {
-      const response = await fetch('http://localhost:8001/api/chat', {
+  const response = await fetch(`${this.AGENT_URL}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -79,7 +85,7 @@ class AiChatService {
         this.sessionId = this.generateSessionId();
         return true;
       } else {
-        const response = await fetch('http://localhost:8001/api/clear-memory', {
+  const response = await fetch(`${this.AGENT_URL}/api/clear-memory`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -138,7 +144,7 @@ class AiChatService {
    */
   async checkFetchAIAgent() {
     try {
-      const response = await fetch('http://localhost:8001/health', {
+  const response = await fetch(`${this.AGENT_URL}/health`, {
         method: 'GET',
         timeout: 5000
       });
