@@ -1,2 +1,3 @@
 uagents
 python-dotenv
+mcp[cli]
