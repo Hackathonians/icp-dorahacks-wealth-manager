@@ -54,20 +54,17 @@ async def main():
     session = await connect()
 
     tools = await session.list_tools()
-    print("Tools:", [t.name for t in tools.tools])
 
     price = await session.call_tool(
         "get_simple_price",
         {"ids": "bitcoin,ethereum", "vs_currencies": "usd"}
     )
-    print("BTC/ETH ->", price.structuredContent or price.content)
 
     # 🔥 You can still reuse `session` later
     price2 = await session.call_tool(
         "get_simple_price",
         {"ids": "dogecoin", "vs_currencies": "usd"}
     )
-    print("DOGE ->", price2.structuredContent or price2.content)
     await close()
 asyncio.run(main())
 
@@ -83,10 +80,8 @@ coingecko_mcp_tools = [
     for tool in tools.tools
 ]
 
-# print(coingecko_mcp_tools)
 
 def gpt_response(messages):
-    print(messages)
     response = gpt_client.responses.create(
         model="gpt-5",
         input=messages,

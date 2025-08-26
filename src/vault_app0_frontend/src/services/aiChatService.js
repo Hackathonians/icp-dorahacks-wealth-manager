@@ -10,7 +10,6 @@ class AiChatService {
       : (import.meta && import.meta.env && import.meta.env.VITE_AGENT_URL)
         ? import.meta.env.VITE_AGENT_URL
         : 'http://localhost:8001';
-    console.log('AI Chat Service initialized in', this.mockMode ? 'mock' : 'real', 'mode. Agent URL:', this.AGENT_URL);
   }
 
   /**

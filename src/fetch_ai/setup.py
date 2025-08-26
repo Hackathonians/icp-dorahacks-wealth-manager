@@ -68,7 +68,6 @@ ASI1_HEADERS = {
 }
 
 CANISTER_ID = os.getenv("CANISTER_ID_VAULT_APP0_BACKEND")
-print(CANISTER_ID)
 BASE_URL = os.getenv("VAULT_APP0_BACKEND_URL") or "http://127.0.0.1:4943"
 
 HEADERS = {
@@ -313,8 +312,6 @@ async def call_icp_endpoint(func_name: str, args: dict):
         payload_user_data.append(requests.post(url, headers=HEADERS, json={"user": args["user_principal"]}).json())
         url = f"{BASE_URL}/unclaimed-dividends"
         payload_user_data.append(requests.post(url, headers=HEADERS, json={"user": args["user_principal"]}).json())
-        print(f"USER QUERY: {args["user_query"]}")
-        print(f"{payload_user_data}")
 
         # CHOOSE FUNCTION CALL
         user_prompt = f"""
@@ -331,9 +328,6 @@ async def call_icp_endpoint(func_name: str, args: dict):
                 tools=coingecko_mcp_tools,
                 tool_choice="auto")
         assistant_message = response.choices[0].message
-        print()
-        print("Assistant Message")
-        print(assistant_message)
 
         # EXECUTE FUNCTION CALL
         i = 1
@@ -342,7 +336,6 @@ async def call_icp_endpoint(func_name: str, args: dict):
         session = await connect()
         for tool_call_ in assistant_message.tool_calls:
             args_ = json.loads(tool_call_.function.arguments)
-            print(tool_call_)
             result = await asyncio.wait_for(session.call_tool(
                 tool_call_.function.name, arguments=args_),
                 timeout=500)
@@ -351,10 +344,6 @@ async def call_icp_endpoint(func_name: str, args: dict):
             payload_response[f"tool call - {i}"]=args_
             i += 1
         await close()
-        print()
-        print("PAYLOAD")
-        print(f"USER QUERY: {args["user_query"]}")
-        print("GPT RESPONSE ...")
         
         # GPT RESPONSE
         gpt_response_result = gpt_response([
@@ -375,7 +364,6 @@ async def call_icp_endpoint(func_name: str, args: dict):
                 {args["user_query"]}"""
             }
         ])
-        print(gpt_response_result)
         return {"response":gpt_response_result}
     # Admin Functions
     elif func_name == "check_admin_status":
