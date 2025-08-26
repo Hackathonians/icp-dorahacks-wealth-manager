@@ -441,12 +441,17 @@ def clear_memory(session_id: str, ctx: Context) -> bool:
         return False
 
 def set_user_principal(session_id: str, user_principal: str, ctx: Context) -> bool:
-    """Set user principal for a chat session."""
+    """Set user principal for a chat session with validation."""
     try:
         # Validate ICP principal format (basic validation)
         if not user_principal or len(user_principal) < 10 or '-' not in user_principal:
             ctx.logger.warning(f"Invalid principal format: {user_principal}")
             return False
+        
+        # Check if session already has a different principal (potential security issue)
+        existing_principal = CHAT_USER_PRINCIPALS.get(session_id)
+        if existing_principal and existing_principal != user_principal:
+            ctx.logger.warning(f"Session {session_id} already has principal {existing_principal}, replacing with {user_principal}")
         
         CHAT_USER_PRINCIPALS[session_id] = user_principal
         ctx.logger.info(f"Set principal for session {session_id}: {user_principal}")
@@ -458,6 +463,18 @@ def set_user_principal(session_id: str, user_principal: str, ctx: Context) -> bo
 def get_user_principal(session_id: str) -> str:
     """Get user principal for a chat session."""
     return CHAT_USER_PRINCIPALS.get(session_id, None)
+
+def validate_session_principal(session_id: str, expected_principal: str, ctx: Context) -> bool:
+    """Validate that the session belongs to the expected user principal."""
+    try:
+        stored_principal = CHAT_USER_PRINCIPALS.get(session_id)
+        if stored_principal and stored_principal != expected_principal:
+            ctx.logger.warning(f"Session {session_id} principal mismatch: stored={stored_principal}, expected={expected_principal}")
+            return False
+        return True
+    except Exception as e:
+        ctx.logger.error(f"Error validating session principal: {str(e)}")
+        return False
 
 def clear_user_principal(session_id: str, ctx: Context) -> bool:
     """Clear user principal for a chat session."""
@@ -796,10 +813,15 @@ async def handle_chat_rest(ctx: Context, req: ChatRequest) -> ChatResponse:
         ctx.logger.info(f"Received REST chat message: {req.message} (session: {req.session_id})")
         user_principal = req.user_principal
         
-        # Automatically store user principal for this session if provided and not already set
-        if user_principal and not get_user_principal(req.session_id):
+        # Validate and store user principal for this session
+        if user_principal:
+            # Validate that this session belongs to this user principal
+            if not validate_session_principal(req.session_id, user_principal, ctx):
+                # If validation fails, clear any existing invalid session data and set the correct one
+                clear_user_principal(req.session_id, ctx)
+            
+            # Always ensure the session has the correct user principal
             set_user_principal(req.session_id, user_principal, ctx)
-            ctx.logger.info(f"Auto-stored user principal for session {req.session_id}: {user_principal}")
         
         response_text = await asyncio.wait_for(
             process_query(req.message, ctx, req.session_id, user_principal),
