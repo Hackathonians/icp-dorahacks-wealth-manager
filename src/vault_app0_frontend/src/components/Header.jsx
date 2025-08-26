@@ -103,8 +103,9 @@ const Header = () => {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 via-orange-500 to-pink-500 rounded-lg flex items-center justify-center">
-              <WalletIcon className="w-6 h-6 text-black" />
+            <div className="w-14 h-14 rounded-lg flex items-center justify-center">
+              {/* icon will be stay here */}
+              <img src="/neurovaultnobg.png" alt="NeuroVault" className="w-18 h-18" />
             </div>
             <div>
               <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-500 via-orange-500 to-pink-500">NeuroVault</h1>
