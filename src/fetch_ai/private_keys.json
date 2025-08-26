@@ -1,0 +1,22 @@
+{
+    "test-ICP-agent": {
+        "identity_key": "552d2d80d0d447ed0bdbecdcdfe1fdf05cbd27172dca652aef6c0fbf47e5d9d4",
+        "wallet_key": "UbnZcP5MdMg0XfMh+4uyRq4c/ZEcM9pNzerWUfJ3JPc="
+    },
+    "test-ICP-agent-2": {
+        "identity_key": "dd80a6c0882739fecb70ef49558b60b263a3a0db0d6a6afaaa387754f67162b8",
+        "wallet_key": "drr+l9G+phJfVHSQNNnpECCUQoepGO9ohdOS7LzBMgc="
+    },
+    "test-ICP-agent-2324sda": {
+        "identity_key": "49c9a3b6650f9386e1b89c3df962023a2deadc615203a2adaa1404c831862724",
+        "wallet_key": "B2g3sHA9LkxqbmAlydmwXnAoYfkXiS8l7nPmsilVZy8="
+    },
+    "test-ICP-agent-test-2": {
+        "identity_key": "5a70a78739705a934cd8da4a08afa642294de3bf86fdab648188cf420c7ad1e2",
+        "wallet_key": "kxDpQ/KaKlJn2kJEwNhArJ6SNia4Uq0RaNUYPgIieeA="
+    },
+    "test-ICP-agent-test-3": {
+        "identity_key": "1f49e5b2351a8b5ef9cb6020fee253639bbb809aa0021410ba5f30e3432d9c19",
+        "wallet_key": "ta0yhdBOuUusdc7F2s+pIaYuzbniXJOlvvi3yALjWWE="
+    }
+}

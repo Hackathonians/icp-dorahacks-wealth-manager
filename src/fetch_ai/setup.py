@@ -12,6 +12,12 @@ from uagents_core.contrib.protocols.chat import (
 from uagents import Agent, Context, Protocol, Model
 from datetime import datetime, timezone
 from uuid import uuid4
+from mcp_setup import *
+from prompt_template import *
+import logging
+import time
+import asyncio
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -62,6 +68,7 @@ ASI1_HEADERS = {
 }
 
 CANISTER_ID = os.getenv("CANISTER_ID_VAULT_APP0_BACKEND")
+print(CANISTER_ID)
 BASE_URL = "http://127.0.0.1:4943"
 
 HEADERS = {
@@ -196,6 +203,31 @@ tools = [
             "strict": True
         }
     },
+
+    # Recommendation Functions from market trends listed on CoinGecko
+    {
+        "type": "function",
+        "function": {
+            "name": "get_analysis_and_recommendation",
+            "description": "Returns analysis and recommendation based on current market trends and user portofolio behaviour.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_principal": {
+                        "type": "string",
+                        "description": "The principal ID of the user to check balance for."
+                    },
+                    "user_query": {
+                        "type": "string",
+                        "description": "The user query."
+                    }
+                },
+                "required": ["user_principal","user_query"],
+                "additionalProperties": False
+            },
+            "strict": True
+        }
+    },
     
     # Admin Functions (require admin privileges)
     {
@@ -267,7 +299,83 @@ async def call_icp_endpoint(func_name: str, args: dict):
     elif func_name == "get_unclaimed_dividends":
         url = f"{BASE_URL}/unclaimed-dividends"
         response = requests.post(url, headers=HEADERS, json={"user": args["user_principal"]})
-    
+
+    # Recommendation Functions
+    elif func_name == "get_analysis_and_recommendation":
+        # GET USER DATA
+        payload_user_data = []
+        url = f"{BASE_URL}/balance"
+        payload_user_data.append(requests.post(url, headers=HEADERS, json={"owner": args["user_principal"]}).json())
+        url = f"{BASE_URL}/user-vault-entries"
+        payload_user_data.append(requests.post(url, headers=HEADERS, json={"user": args["user_principal"]}).json())
+        url = f"{BASE_URL}/user-investment-report"
+        payload_user_data.append(requests.post(url, headers=HEADERS, json={"user": args["user_principal"]}).json())
+        url = f"{BASE_URL}/unclaimed-dividends"
+        payload_user_data.append(requests.post(url, headers=HEADERS, json={"user": args["user_principal"]}).json())
+        print(f"USER QUERY: {args["user_query"]}")
+        print(f"{payload_user_data}")
+
+        # CHOOSE FUNCTION CALL
+        user_prompt = f"""
+        ==> USER DATA:
+        {payload_user_data}
+
+        ==> USER QUERY:
+        {args["user_query"]}"""
+        response = await openai_client.chat.completions.create(
+                model=model,
+                messages=[
+                        {"role": "system","content": system_prompt_coingecko_calling},
+                        {"role": "user", "content": user_prompt}],
+                tools=coingecko_mcp_tools,
+                tool_choice="auto")
+        assistant_message = response.choices[0].message
+        print()
+        print("Assistant Message")
+        print(assistant_message)
+
+        # EXECUTE FUNCTION CALL
+        i = 1
+        payload_response = {}
+        session = None
+        session = await connect()
+        for tool_call_ in assistant_message.tool_calls:
+            args_ = json.loads(tool_call_.function.arguments)
+            print(tool_call_)
+            result = await asyncio.wait_for(session.call_tool(
+                tool_call_.function.name, arguments=args_),
+                timeout=500)
+            args_["function_name"] = tool_call_.function.name
+            args_["tool_call_result"] = json.loads(result.content[0].text)
+            payload_response[f"tool call - {i}"]=args_
+            i += 1
+        await close()
+        print()
+        print("PAYLOAD")
+        print(f"USER QUERY: {args["user_query"]}")
+        print("GPT RESPONSE ...")
+        
+        # GPT RESPONSE
+        gpt_response_result = gpt_response([
+            {
+                "role":"system",
+                "content":system_prompt_coingecko_response
+            },
+            {
+                "role":"user",
+                "content":f"""
+                ==> FUNCTION CALLING RESULT:
+                {payload_response}
+
+                ==> USER DATA:
+                {payload_user_data}
+
+                ==> USER QUERY:
+                {args["user_query"]}"""
+            }
+        ])
+        print(gpt_response_result)
+        return {"response":gpt_response_result}
     # Admin Functions
     elif func_name == "check_admin_status":
         url = f"{BASE_URL}/admin-check"
@@ -461,6 +569,7 @@ Always be friendly, helpful, and clear in your responses.{user_context}"""
         for tool_call in tool_calls:
             func_name = tool_call["function"]["name"]
             arguments = json.loads(tool_call["function"]["arguments"])
+            arguments["user_query"] = query
             tool_call_id = tool_call["id"]
 
             ctx.logger.info(f"Executing {func_name} with arguments: {arguments}")
@@ -494,7 +603,7 @@ Always be friendly, helpful, and clear in your responses.{user_context}"""
                             content_to_send = json.dumps(result)
                 else:
                     # Regular function call
-                    result = await call_icp_endpoint(func_name, arguments)
+                    result = await asyncio.wait_for(call_icp_endpoint(func_name, arguments),timeout=500)
                     content_to_send = json.dumps(result)
                     
             except Exception as e:
@@ -568,7 +677,9 @@ async def handle_chat_message(ctx: Context, sender: str, msg: ChatMessage):
                 continue
             elif isinstance(item, TextContent):
                 ctx.logger.info(f"Got a message from {sender}: {item.text}")
-                response_text = await process_query(item.text, ctx, session_id, None)
+                response_text = await asyncio.wait_for(
+                    process_query(item.text, ctx, session_id, None),
+                    timeout=500)
                 ctx.logger.info(f"Response text: {response_text}")
                 response = ChatMessage(
                     timestamp=datetime.now(timezone.utc),
@@ -602,7 +713,9 @@ async def handle_chat_rest(ctx: Context, req: ChatRequest) -> ChatResponse:
     try:
         ctx.logger.info(f"Received REST chat message: {req.message} (session: {req.session_id})")
         user_principal = req.user_principal
-        response_text = await process_query(req.message, ctx, req.session_id, user_principal)
+        response_text = await asyncio.wait_for(
+            process_query(req.message, ctx, req.session_id, user_principal),
+            timeout=500)
         return ChatResponse(
             response=response_text,
             timestamp=datetime.now().isoformat(),
