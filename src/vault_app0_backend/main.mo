@@ -20,7 +20,7 @@ import Types "./types";
 persistent actor VaultApp {
   // Admin principals - multiple admins supported
   private let admins : [Principal] = [
-    Principal.fromText("xygmt-g36ra-6fx4l-vrohf-fhtid-h7jba-gbumz-34aii-c2j73-vh53b-mqe"), // Original admin
+    Principal.fromText("u5vzr-rezjh-saa2m-wrzhc-abvjm-64xad-eedcm-q7qct-aifoe-dikkh-5ae"), // Original admin
     Principal.fromText("ddm5i-napuo-a6jjo-czjha-xcr4l-dzpqe-uygc7-w3yxz-dmqso-zd36q-eae") // New admin
   ];
 

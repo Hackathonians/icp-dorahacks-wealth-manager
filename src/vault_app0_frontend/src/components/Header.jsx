@@ -85,7 +85,8 @@ const Header = () => {
   const formatPrincipal = (principal) => {
     if (!principal) return '';
     const str = principal.toString();
-    return `${str.slice(0, 8)}...${str.slice(-8)}`;
+    // return `${str.slice(0, 8)}...${str.slice(-8)}`;
+    return str;
   };
 
   const handleCopyAddress = async () => {
