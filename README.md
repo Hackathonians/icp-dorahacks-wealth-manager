@@ -5,6 +5,8 @@ NeuroVault presents a transformative solution for managing crypto assets effecti
 ## Fetch-ai Agent
 
 - Name: NeuroVault Wealth management
+- Address: test-agent://agent1qtxg5zw949un6ewdahwucqwts4d39h6gz5d0hl8xeztcvpdf65ggjs25mdp
+  ![tag:innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3)
 
 ## Features
 
