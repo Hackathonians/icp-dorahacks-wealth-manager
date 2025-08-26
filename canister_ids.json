@@ -1,5 +1,8 @@
 {
   "vault_app0_backend": {
     "ic": "p3pu5-yyaaa-aaaai-q33eq-cai"
+  },
+  "vault_app0_frontend": {
+    "ic": "pvnzv-diaaa-aaaai-q33fq-cai"
   }
 }

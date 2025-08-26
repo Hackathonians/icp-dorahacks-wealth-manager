@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
   const [actor, setActor] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const canisterId = process.env.CANISTER_ID_VAULT_APP0_BACKEND || 'rdmx6-jaaaa-aaaah-qcaiq-cai';
+  const canisterId = process.env.CANISTER_ID_VAULT_APP0_BACKEND || 'p3pu5-yyaaa-aaaai-q33eq-cai';
 
   useEffect(() => {
     initAuth();
