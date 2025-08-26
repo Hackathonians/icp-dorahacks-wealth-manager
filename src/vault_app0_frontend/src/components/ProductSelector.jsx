@@ -71,9 +71,9 @@ const ProductSelector = ({ onProductSelect, selectedProduct, selectedDuration, o
     return (
       <div className="glass rounded-lg p-6">
         <div className="text-center">
-          <ShoppingBagIcon className="w-12 h-12 text-white text-opacity-50 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-white mb-2">No Products Available</h3>
-          <p className="text-white text-opacity-70">
+          <ShoppingBagIcon className="w-12 h-12 text-black text-opacity-50 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-black mb-2">No Products Available</h3>
+          <p className="text-black text-opacity-70">
             No staking products are currently available. Please contact the administrator.
           </p>
         </div>
@@ -85,7 +85,7 @@ const ProductSelector = ({ onProductSelect, selectedProduct, selectedDuration, o
     <div className="space-y-6">
       {/* Product Selection */}
       <div className="glass rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+        <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
           <ShoppingBagIcon className="w-5 h-5 mr-2" />
           Select Staking Product
         </h3>
@@ -96,25 +96,25 @@ const ProductSelector = ({ onProductSelect, selectedProduct, selectedDuration, o
               key={product.id}
               className={`border rounded-lg p-4 cursor-pointer transition-all ${
                 selectedProduct?.id === product.id
-                  ? 'border-blue-400 bg-blue-500 bg-opacity-20'
-                  : 'border-white border-opacity-20 hover:border-white hover:border-opacity-40 bg-white bg-opacity-5 hover:bg-opacity-10'
+                  ? 'border-orange-400 bg-orange-50'
+                  : 'border-slate-200 hover:border-orange-300 bg-white/70 hover:bg-white'
               }`}
               onClick={() => onProductSelect(product)}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center">
-                    <h4 className="font-medium text-white">{product.name}</h4>
+                    <h4 className="font-medium text-slate-900">{product.name}</h4>
                     {selectedProduct?.id === product.id && (
-                      <CheckCircleIcon className="w-5 h-5 text-blue-400 ml-2" />
+                      <CheckCircleIcon className="w-5 h-5 text-orange-500 ml-2" />
                     )}
                   </div>
-                  <p className="text-white text-opacity-70 text-sm mt-1">
+                  <p className="text-slate-700 text-sm mt-1">
                     {product.description}
                   </p>
                   <div className="flex items-center mt-2">
-                    <ClockIcon className="w-4 h-4 text-white text-opacity-50 mr-1" />
-                    <span className="text-white text-opacity-60 text-xs">
+                    <ClockIcon className="w-4 h-4 text-slate-600 mr-1" />
+                    <span className="text-slate-600 text-xs">
                       {product.available_durations.length} duration option{product.available_durations.length > 1 ? 's' : ''} available
                     </span>
                   </div>
@@ -128,7 +128,7 @@ const ProductSelector = ({ onProductSelect, selectedProduct, selectedDuration, o
       {/* Duration Selection */}
       {selectedProduct && (
         <div className="glass rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
             <ClockIcon className="w-5 h-5 mr-2" />
             Select Lock Duration
           </h3>
@@ -143,23 +143,23 @@ const ProductSelector = ({ onProductSelect, selectedProduct, selectedDuration, o
                   key={index}
                   className={`border rounded-lg p-4 cursor-pointer transition-all ${
                     isSelected
-                      ? 'border-green-400 bg-green-500 bg-opacity-20'
-                      : 'border-white border-opacity-20 hover:border-white hover:border-opacity-40 bg-white bg-opacity-5 hover:bg-opacity-10'
+                      ? 'border-orange-400 bg-orange-50'
+                      : 'border-slate-200 hover:border-orange-300 bg-white/70 hover:bg-white'
                   }`}
                   onClick={() => onDurationSelect(duration)}
                 >
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="flex items-center">
-                        <span className="font-medium text-white">
+                        <span className="font-medium text-slate-900">
                           {formatDuration(duration)}
                         </span>
                         {isSelected && (
-                          <CheckCircleIcon className="w-4 h-4 text-green-400 ml-2" />
+                          <CheckCircleIcon className="w-4 h-4 text-orange-500 ml-2" />
                         )}
                       </div>
                       <span className={`text-xs ${
-                        isFlexible ? 'text-blue-400' : 'text-yellow-400'
+                        isFlexible ? 'text-blue-600' : 'text-yellow-600'
                       }`}>
                         {isFlexible ? 'Flexible staking' : 'Time-locked staking'}
                       </span>
@@ -170,14 +170,14 @@ const ProductSelector = ({ onProductSelect, selectedProduct, selectedDuration, o
             })}
           </div>
 
-          <div className="mt-4 p-3 bg-blue-500 bg-opacity-20 border border-blue-400 border-opacity-30 rounded-lg">
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-300 rounded-lg">
             <div className="flex items-start space-x-2">
-              <InformationCircleIcon className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+              <InformationCircleIcon className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-blue-100 text-sm">
+                <p className="text-blue-700 text-sm">
                   <strong>Flexible staking:</strong> Withdraw anytime, lower rewards
                 </p>
-                <p className="text-blue-100 text-sm mt-1">
+                <p className="text-blue-700 text-sm mt-1">
                   <strong>Time-locked staking:</strong> Higher rewards, locked for specified period
                 </p>
               </div>

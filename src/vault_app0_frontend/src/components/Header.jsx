@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { WalletIcon, ArrowRightOnRectangleIcon, LockClosedIcon, ChatBubbleLeftRightIcon, GiftIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { WalletIcon, ArrowRightOnRectangleIcon, LockClosedIcon, ChatBubbleLeftRightIcon, GiftIcon, ClockIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import AiChatInterface from './AiChatInterface';
 import toast from 'react-hot-toast';
 
@@ -88,17 +88,28 @@ const Header = () => {
     return `${str.slice(0, 8)}...${str.slice(-8)}`;
   };
 
+  const handleCopyAddress = async () => {
+    try {
+      if (!principal) return;
+      await navigator.clipboard.writeText(principal.toString());
+      toast.success('Address copied');
+    } catch (e) {
+      toast.error('Failed to copy');
+    }
+  };
+
   return (
     <header className="glass sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
-              <WalletIcon className="w-6 h-6 text-white" />
+            <div className="w-14 h-14 rounded-lg flex items-center justify-center">
+              {/* icon will be stay here */}
+              <img src="/neurovaultnobg.png" alt="NeuroVault" className="w-18 h-18" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-green-500">USDX Vault</h1>
-              <p className="text-white text-opacity-70 text-sm">Token Vault & Dividends</p>
+              <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-500 via-orange-500 to-pink-500">NeuroVault</h1>
+              <p className="text-slate-800 text-xs sm:text-sm">Revolutionizing Wealth Management</p>
             </div>
           </div>
           
@@ -107,7 +118,7 @@ const Header = () => {
               <div className="flex items-center space-x-4">
                 {/* Test Token Faucet - Prominent header button */}
                 {cooldownRemaining > 0 ? (
-                  <div className="bg-orange-600 bg-opacity-70 text-white px-3 py-2 rounded-lg font-medium flex items-center space-x-2 cursor-not-allowed" title={`Faucet cooldown: ${formatCooldownTime(cooldownRemaining)} remaining`}>
+                  <div className="bg-orange-600 bg-opacity-80 text-white px-3 py-2 rounded-lg font-medium flex items-center space-x-2 cursor-not-allowed" title={`Faucet cooldown: ${formatCooldownTime(cooldownRemaining)} remaining`}>
                     <ClockIcon className="w-4 h-4" />
                     <span className="text-sm">{formatCooldownTime(cooldownRemaining)}</span>
                   </div>
@@ -115,7 +126,7 @@ const Header = () => {
                   <button
                     onClick={handleGetTestTokens}
                     disabled={faucetLoading}
-                    className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-3 py-2 rounded-lg font-medium flex items-center space-x-2 transition-colors animate-pulse"
+                    className="bg-gradient-to-r from-yellow-500 via-orange-500 to-pink-500 hover:brightness-110 disabled:opacity-60 text-white px-3 py-2 rounded-lg font-medium flex items-center space-x-2 transition-all shadow"
                     title="Get 100 USDX test tokens (1 hour cooldown)"
                   >
                     {faucetLoading ? (
@@ -135,7 +146,7 @@ const Header = () => {
                 {/* AI Chat Button - Only visible when authenticated */}
                 <button
                   onClick={() => setIsChatOpen(true)}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 transition-colors"
+                  className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 transition-colors"
                   title="Chat with AI Assistant"
                 >
                   <ChatBubbleLeftRightIcon className="w-4 h-4" />
@@ -143,10 +154,19 @@ const Header = () => {
                 </button>
                 
                 <div className="glass rounded-lg px-4 py-2">
-                  <p className="text-white text-sm font-medium">Connected</p>
-                  <p className="text-white text-opacity-70 text-xs font-mono">
-                    {formatPrincipal(principal)}
-                  </p>
+                  <p className="text-slate-900 text-sm font-medium">Connected</p>
+                  <div className="flex items-center space-x-2">
+                    <p className="text-slate-700 text-xs font-mono">
+                      {formatPrincipal(principal)}
+                    </p>
+                    <button
+                      onClick={handleCopyAddress}
+                      className="p-1 rounded hover:bg-white/70 transition-colors"
+                      title="Copy address"
+                    >
+                      <DocumentDuplicateIcon className="w-4 h-4 text-slate-700" />
+                    </button>
+                  </div>
                 </div>
                 <button
                   onClick={logout}
@@ -160,7 +180,7 @@ const Header = () => {
               <button
                 onClick={login}
                 disabled={loading}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-6 py-2 rounded-lg font-medium flex items-center space-x-2"
+                className="bg-gradient-to-r from-yellow-500 via-orange-500 to-pink-500 hover:brightness-110 disabled:opacity-60 text-white px-6 py-2 rounded-lg font-medium flex items-center space-x-2"
               >
                 {loading ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

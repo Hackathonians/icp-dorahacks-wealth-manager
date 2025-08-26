@@ -643,7 +643,7 @@ persistent actor VaultApp {
   public shared (msg) func faucet_get_test_tokens() : async Result.Result<Nat, Text> {
     let caller = msg.caller;
     let now = Time.now();
-    
+
     // Check cooldown period
     switch (faucet_last_request.get(caller)) {
       case (?last_request_time) {
@@ -651,31 +651,31 @@ persistent actor VaultApp {
         if (time_since_last < faucet_cooldown_nanoseconds) {
           let remaining_nanoseconds = faucet_cooldown_nanoseconds - time_since_last;
           let remaining_seconds = if (remaining_nanoseconds > 0) {
-            remaining_nanoseconds / 1_000_000_000
+            remaining_nanoseconds / 1_000_000_000;
           } else {
-            0
+            0;
           };
           return #err("Faucet cooldown active. Try again in " # Int.toText(remaining_seconds) # " seconds");
         };
       };
       case null { /* First time user, proceed */ };
     };
-    
+
     // Check admin balance
     let admin_balance = getBalance(admin_account);
     if (admin_balance < faucet_amount) {
       return #err("Faucet temporarily unavailable - insufficient admin balance");
     };
-    
+
     // Transfer test tokens
     let user_account : Types.Account = { owner = caller; subaccount = null };
     setBalance(admin_account, admin_balance - faucet_amount);
     let user_balance = getBalance(user_account);
     setBalance(user_account, user_balance + faucet_amount);
-    
+
     // Update cooldown
     faucet_last_request.put(caller, now);
-    
+
     let tx_id = nextTxId();
     #ok(tx_id);
   };
@@ -2002,12 +2002,12 @@ persistent actor VaultApp {
         ("Content-Type", "application/json"),
         ("Access-Control-Allow-Origin", "*"),
         ("Access-Control-Allow-Methods", "GET, POST, OPTIONS"),
-        ("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        ("Access-Control-Allow-Headers", "Content-Type, Authorization"),
       ];
       body = Blob.toArray(Text.encodeUtf8(body));
       streaming_strategy = null;
       upgrade = null;
-    }
+    };
   };
 
   // Helper function to extract substring from text
@@ -2021,7 +2021,7 @@ persistent actor VaultApp {
       };
       i += 1;
     };
-    result
+    result;
   };
 
   // Helper function to get character at specific position
@@ -2034,7 +2034,7 @@ persistent actor VaultApp {
       };
       i += 1;
     };
-    null
+    null;
   };
 
   // Helper function to extract JSON field from request body
@@ -2043,19 +2043,19 @@ persistent actor VaultApp {
       case (?text) { text };
       case null { return null };
     };
-    
+
     // Simple JSON parsing - look for "field":"value" pattern
     let searchPattern = "\"" # field # "\":";
     let textLength = Text.size(bodyText);
     let patternLength = Text.size(searchPattern);
-    
+
     var i = 0;
     while (i <= textLength - patternLength) {
       let substring = subText(bodyText, i, i + patternLength);
       if (substring == searchPattern) {
         // Found the field, now extract the value
         let afterPattern = subText(bodyText, i + patternLength, textLength);
-        
+
         // Skip whitespace and find quote or number
         var j = 0;
         let afterLength = Text.size(afterPattern);
@@ -2064,7 +2064,7 @@ persistent actor VaultApp {
             case (?c) { c };
             case null { return null };
           };
-          
+
           if (char == "\"") {
             // String value - find closing quote
             let stringStart = j + 1;
@@ -2104,27 +2104,27 @@ persistent actor VaultApp {
       };
       i += 1;
     };
-    
+
     // Fallback for backward compatibility with existing Bitcoin endpoints
     if (field == "address") {
-      ?"tb1qexample1234567890abcdef"
+      ?"tb1qexample1234567890abcdef";
     } else if (field == "destinationAddress") {
-      ?"tb1qdestination123456789"
+      ?"tb1qdestination123456789";
     } else if (field == "amountInSatoshi") {
-      ?"50000"
+      ?"50000";
     } else {
-      null
-    }
+      null;
+    };
   };
 
   // Handle static HTTP routes (GET requests)
   private func handleRoute(method : Text, url : Text) : Types.HttpResponse {
-    let normalizedUrl = if (Text.startsWith(url, #char('/'))) { 
+    let normalizedUrl = if (Text.startsWith(url, #char('/'))) {
       let urlIter = url.chars();
-      ignore(urlIter.next()); // skip first character
-      Text.fromIter(urlIter)
-    } else { 
-      url 
+      ignore (urlIter.next()); // skip first character
+      Text.fromIter(urlIter);
+    } else {
+      url;
     };
 
     switch (method, normalizedUrl) {
@@ -2145,12 +2145,12 @@ persistent actor VaultApp {
             ("Content-Type", "application/json"),
             ("Access-Control-Allow-Origin", "*"),
             ("Access-Control-Allow-Methods", "GET, POST, OPTIONS"),
-            ("Access-Control-Allow-Headers", "Content-Type, Authorization")
+            ("Access-Control-Allow-Headers", "Content-Type, Authorization"),
           ];
           body = Blob.toArray(Text.encodeUtf8("{}"));
           streaming_strategy = null;
           upgrade = ?true; // This tells ICP to route to http_request_update
-        }
+        };
       };
       case _ {
         makeJsonResponse(404, "{\"error\":\"Endpoint not found\",\"message\":\"Use POST for canister methods\"}");
@@ -2160,12 +2160,12 @@ persistent actor VaultApp {
 
   // Handle dynamic HTTP routes (POST requests that call canister methods)
   private func handleRouteUpdate(method : Text, url : Text, body : [Nat8]) : async Types.HttpResponse {
-    let normalizedUrl = if (Text.startsWith(url, #char('/'))) { 
+    let normalizedUrl = if (Text.startsWith(url, #char('/'))) {
       let urlIter = url.chars();
-      ignore(urlIter.next()); // skip first character
-      Text.fromIter(urlIter)
-    } else { 
-      url 
+      ignore (urlIter.next()); // skip first character
+      Text.fromIter(urlIter);
+    } else {
+      url;
     };
 
     switch (method, normalizedUrl) {
@@ -2197,16 +2197,17 @@ persistent actor VaultApp {
       case ("POST", "products") {
         let products = await get_active_products();
         let productsJson = Array.foldLeft<Types.Product, Text>(
-          products, 
-          "[", 
+          products,
+          "[",
           func(acc, product) {
             let productJson = "{\"id\":" # Nat.toText(product.id) # ",\"name\":\"" # product.name # "\",\"description\":\"" # product.description # "\"}";
-            if (acc == "[") { acc # productJson } else { acc # "," # productJson }
-          }
+            if (acc == "[") { acc # productJson } else {
+              acc # "," # productJson;
+            };
+          },
         ) # "]";
         makeJsonResponse(200, "{\"products\":" # productsJson # "}");
       };
-
 
       // ========== REAL VAULT ENDPOINTS ==========
 
@@ -2217,7 +2218,7 @@ persistent actor VaultApp {
             try {
               let user = Principal.fromText(userText);
               let entries = await get_user_vault_entries(user);
-              let entriesJson = Array.foldLeft<{id : Nat; amount : Nat; locked_at : Nat64; unlock_time : ?Nat64; can_unlock : Bool; is_flexible : Bool; product_id : Nat; selected_duration : Types.LockDuration}, Text>(
+              let entriesJson = Array.foldLeft<{ id : Nat; amount : Nat; locked_at : Nat64; unlock_time : ?Nat64; can_unlock : Bool; is_flexible : Bool; product_id : Nat; selected_duration : Types.LockDuration }, Text>(
                 entries,
                 "[",
                 func(acc, entry) {
@@ -2228,11 +2229,17 @@ persistent actor VaultApp {
                   let durationText = switch (entry.selected_duration) {
                     case (#Minutes(min)) { Int.toText(min) };
                   };
-                  let canUnlockText = if (entry.can_unlock) { "true" } else { "false" };
-                  let isFlexibleText = if (entry.is_flexible) { "true" } else { "false" };
+                  let canUnlockText = if (entry.can_unlock) { "true" } else {
+                    "false";
+                  };
+                  let isFlexibleText = if (entry.is_flexible) { "true" } else {
+                    "false";
+                  };
                   let entryJson = "{\"id\":" # Nat.toText(entry.id) # ",\"amount\":" # Nat.toText(entry.amount) # ",\"locked_at\":" # Nat64.toText(entry.locked_at) # ",\"unlock_time\":" # unlockTimeText # ",\"can_unlock\":" # canUnlockText # ",\"is_flexible\":" # isFlexibleText # ",\"product_id\":" # Nat.toText(entry.product_id) # ",\"duration_minutes\":" # durationText # "}";
-                  if (acc == "[") { acc # entryJson } else { acc # "," # entryJson }
-                }
+                  if (acc == "[") { acc # entryJson } else {
+                    acc # "," # entryJson;
+                  };
+                },
               ) # "]";
               makeJsonResponse(200, "{\"entries\":" # entriesJson # ",\"user\":\"" # userText # "\"}");
             } catch (e) {
@@ -2281,8 +2288,10 @@ persistent actor VaultApp {
                 "[",
                 func(acc, dividend) {
                   let dividendJson = "{\"distribution_id\":" # Nat.toText(dividend.0) # ",\"amount\":" # Nat.toText(dividend.1) # "}";
-                  if (acc == "[") { acc # dividendJson } else { acc # "," # dividendJson }
-                }
+                  if (acc == "[") { acc # dividendJson } else {
+                    acc # "," # dividendJson;
+                  };
+                },
               ) # "]";
               makeJsonResponse(200, "{\"unclaimed_dividends\":" # dividendsJson # ",\"user\":\"" # userText # "\"}");
             } catch (e) {
@@ -2300,19 +2309,25 @@ persistent actor VaultApp {
           case (?amountText, ?productIdText, ?durationText) {
             try {
               let amount = switch (Nat.fromText(amountText)) {
-                case null { return makeJsonResponse(400, "{\"error\":\"Invalid amount\"}"); };
+                case null {
+                  return makeJsonResponse(400, "{\"error\":\"Invalid amount\"}");
+                };
                 case (?n) { n };
               };
               let productId = switch (Nat.fromText(productIdText)) {
-                case null { return makeJsonResponse(400, "{\"error\":\"Invalid product_id\"}"); };
+                case null {
+                  return makeJsonResponse(400, "{\"error\":\"Invalid product_id\"}");
+                };
                 case (?n) { n };
               };
               let durationMinutes = switch (Nat.fromText(durationText)) {
-                case null { return makeJsonResponse(400, "{\"error\":\"Invalid duration_minutes\"}"); };
+                case null {
+                  return makeJsonResponse(400, "{\"error\":\"Invalid duration_minutes\"}");
+                };
                 case (?n) { n };
               };
               let duration : Types.LockDuration = #Minutes(durationMinutes);
-              
+
               // Note: This would need to be called by a user, but HTTP endpoints don't have caller context
               // In a real implementation, you'd need to authenticate the user somehow
               makeJsonResponse(400, "{\"error\":\"Lock tokens requires user authentication - use canister calls instead\"}");
@@ -2331,7 +2346,9 @@ persistent actor VaultApp {
           case (?distributionIdText) {
             try {
               let distributionId = switch (Nat.fromText(distributionIdText)) {
-                case null { return makeJsonResponse(400, "{\"error\":\"Invalid distribution_id\"}"); };
+                case null {
+                  return makeJsonResponse(400, "{\"error\":\"Invalid distribution_id\"}");
+                };
                 case (?n) { n };
               };
               // Note: This would need to be called by a user, but HTTP endpoints don't have caller context
@@ -2373,7 +2390,7 @@ persistent actor VaultApp {
               if (not isAdmin(adminPrincipal)) {
                 return makeJsonResponse(403, "{\"error\":\"Unauthorized - admin access required\"}");
               };
-              
+
               let reportResult = await admin_get_investment_report();
               switch (reportResult) {
                 case (#ok(report)) {
@@ -2402,12 +2419,14 @@ persistent actor VaultApp {
               if (not isAdmin(adminPrincipal)) {
                 return makeJsonResponse(403, "{\"error\":\"Unauthorized - admin access required\"}");
               };
-              
+
               let amount = switch (Nat.fromText(amountText)) {
-                case null { return makeJsonResponse(400, "{\"error\":\"Invalid amount\"}"); };
+                case null {
+                  return makeJsonResponse(400, "{\"error\":\"Invalid amount\"}");
+                };
                 case (?n) { n };
               };
-              
+
               // Note: This would need proper caller authentication in a real implementation
               makeJsonResponse(400, "{\"error\":\"Admin functions require proper authentication - use canister calls instead\"}");
             } catch (e) {
@@ -2442,8 +2461,10 @@ persistent actor VaultApp {
               case (?days) { Nat.toText(days) };
             };
             let instrumentJson = "{\"id\":" # Nat.toText(instrument.id) # ",\"name\":\"" # instrument.name # "\",\"description\":\"" # instrument.description # "\",\"type\":\"" # typeText # "\",\"expected_apy\":" # Float.toText(instrument.expected_apy) # ",\"risk_level\":" # Nat.toText(instrument.risk_level) # ",\"min_investment\":" # Nat.toText(instrument.min_investment) # ",\"max_investment\":" # maxInvestmentText # ",\"lock_period_days\":" # lockPeriodText # ",\"total_invested\":" # Nat.toText(instrument.total_invested) # ",\"total_yield_earned\":" # Nat.toText(instrument.total_yield_earned) # "}";
-            if (acc == "[") { acc # instrumentJson } else { acc # "," # instrumentJson }
-          }
+            if (acc == "[") { acc # instrumentJson } else {
+              acc # "," # instrumentJson;
+            };
+          },
         ) # "]";
         makeJsonResponse(200, "{\"instruments\":" # instrumentsJson # "}");
       };
@@ -2456,11 +2477,11 @@ persistent actor VaultApp {
 
   // HTTP request handler for query calls (GET, OPTIONS)
   public query func http_request(request : Types.HttpRequest) : async Types.HttpResponse {
-    handleRoute(request.method, request.url)
+    handleRoute(request.method, request.url);
   };
 
   // HTTP request handler for update calls (POST)
   public func http_request_update(request : Types.HttpRequest) : async Types.HttpResponse {
-    await handleRouteUpdate(request.method, request.url, request.body)
+    await handleRouteUpdate(request.method, request.url, request.body);
   };
 };

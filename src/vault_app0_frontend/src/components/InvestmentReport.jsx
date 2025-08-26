@@ -176,7 +176,7 @@ const InvestmentReport = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg">
               <h3 className="text-sm font-medium text-blue-600">Total Investments</h3>
-              <p className="text-2xl font-bold text-blue-800">{userReport.summary.total_investments}</p>
+              <p className="text-2xl font-bold text-blue-800">{userReport.summary.total_investments.toString()}</p>
             </div>
             <div className="bg-green-50 p-4 rounded-lg">
               <h3 className="text-sm font-medium text-green-600">Amount Invested</h3>

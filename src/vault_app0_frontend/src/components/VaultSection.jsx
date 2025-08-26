@@ -95,29 +95,29 @@ const VaultSection = ({ userVaultEntries, onRefresh }) => {
 
   return (
     <div className="card">
-      <h2 className="text-xl font-bold text-white mb-6">Vault Operations</h2>
+      <h2 className="text-xl font-bold text-slate-900 mb-6">Vault Operations</h2>
 
       {/* Existing Vault Entries */}
       {userVaultEntries && userVaultEntries.length > 0 && (
         <div className="space-y-4 mb-6">
-          <h3 className="text-lg font-semibold text-white">Your Staking Positions</h3>
+          <h3 className="text-lg font-semibold text-slate-900">Your Staking Positions</h3>
           {userVaultEntries.map((entry) => (
-            <div key={entry.id} className="glass rounded-lg p-4 border border-white border-opacity-20">
+            <div key={entry.id} className="glass rounded-lg p-4 border border-slate-200/60">
               <div className="flex justify-between items-start mb-3">
                 <div>
-                  <h4 className="text-md font-semibold text-white">
+                  <h4 className="text-md font-semibold text-slate-900">
                     Entry #{entry.id} - {entry.is_flexible ? 'Flexible Staking' : 'Time-Locked Staking'}
                   </h4>
                   {entry.product_id && (
-                    <p className="text-sm text-white text-opacity-70">
+                    <p className="text-sm text-slate-700">
                       Product ID: {entry.product_id} | Duration: {formatDuration(entry.selected_duration)}
                     </p>
                   )}
                 </div>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                   entry.can_unlock 
-                    ? 'bg-blue-500 bg-opacity-20 text-blue-300 border border-blue-400' 
-                    : 'bg-orange-500 bg-opacity-20 text-orange-300 border border-orange-400'
+                    ? 'bg-blue-50 text-blue-600 border border-blue-300' 
+                    : 'bg-orange-50 text-orange-600 border border-orange-300'
                 }`}>
                   {entry.can_unlock ? 'Ready to Unlock' : 'Locked'}
                 </span>
@@ -125,28 +125,28 @@ const VaultSection = ({ userVaultEntries, onRefresh }) => {
               
               <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                 <div>
-                  <span className="text-white text-opacity-70">Amount:</span>
-                  <span className="font-semibold text-white ml-2">
+                  <span className="text-slate-700">Amount:</span>
+                  <span className="font-semibold text-slate-900 ml-2">
                     {(Number(entry.amount) / 1000000).toFixed(2)} USDX
                   </span>
                 </div>
                 <div>
-                  <span className="text-white text-opacity-70">Locked At:</span>
-                  <span className="font-semibold text-white ml-2">
+                  <span className="text-slate-700">Locked At:</span>
+                  <span className="font-semibold text-slate-900 ml-2">
                     {formatTimestamp(entry.locked_at)}
                   </span>
                 </div>
                 {entry.unlock_time && (
                   <>
                     <div>
-                      <span className="text-white text-opacity-70">Unlock Time:</span>
-                      <span className="font-semibold text-white ml-2">
+                      <span className="text-slate-700">Unlock Time:</span>
+                      <span className="font-semibold text-slate-900 ml-2">
                         {formatTimestamp(entry.unlock_time)}
                       </span>
                     </div>
                     <div>
-                      <span className="text-white text-opacity-70">Status:</span>
-                      <span className={`font-semibold ml-2 ${entry.can_unlock ? 'text-blue-400' : 'text-orange-400'}`}>
+                      <span className="text-slate-700">Status:</span>
+                      <span className={`font-semibold ml-2 ${entry.can_unlock ? 'text-blue-600' : 'text-orange-600'}`}>
                         {getTimeUntilUnlock(entry.unlock_time)}
                       </span>
                     </div>
@@ -154,8 +154,8 @@ const VaultSection = ({ userVaultEntries, onRefresh }) => {
                 )}
                 {entry.is_flexible && (
                   <div className="col-span-2">
-                    <span className="text-white text-opacity-70">Type:</span>
-                    <span className="font-semibold text-blue-400 ml-2">
+                    <span className="text-slate-700">Type:</span>
+                    <span className="font-semibold text-blue-600 ml-2">
                       Flexible - Can withdraw anytime
                     </span>
                   </div>
@@ -168,7 +168,7 @@ const VaultSection = ({ userVaultEntries, onRefresh }) => {
                 className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
                   entry.can_unlock && !loading
                     ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'bg-white bg-opacity-10 text-white text-opacity-50 cursor-not-allowed'
+                    : 'bg-white/70 text-slate-500 cursor-not-allowed'
                 }`}
               >
                 {loading ? 'Processing...' : `Unlock Entry #${entry.id}`}
@@ -180,12 +180,12 @@ const VaultSection = ({ userVaultEntries, onRefresh }) => {
 
       {/* New Staking Form */}
       <div className="space-y-6">
-        <div className="border-t border-white border-opacity-20 pt-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Create New Staking Position</h3>
+        <div className="border-t border-slate-200/60 pt-6">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">Create New Staking Position</h3>
           
           {/* Amount Input */}
           <div className="glass rounded-lg p-4 mb-6">
-            <label htmlFor="lockAmount" className="block text-sm font-medium text-white mb-2">
+            <label htmlFor="lockAmount" className="block text-sm font-medium text-slate-800 mb-2">
               Amount to Lock (USDX)
             </label>
             <input
@@ -196,7 +196,7 @@ const VaultSection = ({ userVaultEntries, onRefresh }) => {
               placeholder="Enter amount to lock"
               step="0.01"
               min="0"
-              className="w-full px-3 py-2 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-white placeholder-opacity-50"
+              className="w-full px-3 py-2 bg-white/90 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 placeholder-slate-400"
               required
             />
           </div>
@@ -220,16 +220,16 @@ const VaultSection = ({ userVaultEntries, onRefresh }) => {
             </button>
           </form>
 
-          <div className="bg-blue-500 bg-opacity-20 border border-blue-400 border-opacity-30 rounded-lg p-4 mt-4">
+          <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 mt-4">
             <div className="flex items-start space-x-3">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>
               </div>
               <div>
-                <h4 className="text-sm font-medium text-blue-100">How it works</h4>
-                <p className="text-sm text-blue-200">
+                <h4 className="text-sm font-medium text-blue-700">How it works</h4>
+                <p className="text-sm text-blue-700">
                   Choose from available staking products, each with different duration options and features. 
                   All staked tokens are eligible for dividend distributions based on the product terms.
                 </p>
