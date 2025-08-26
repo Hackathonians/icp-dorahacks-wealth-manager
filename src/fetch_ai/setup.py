@@ -69,10 +69,11 @@ ASI1_HEADERS = {
 
 CANISTER_ID = os.getenv("CANISTER_ID_VAULT_APP0_BACKEND")
 print(CANISTER_ID)
-BASE_URL = "http://127.0.0.1:4943"
+BASE_URL = os.getenv("VAULT_APP0_BACKEND_URL") or "http://127.0.0.1:4943"
 
 HEADERS = {
-    "Host": f"{CANISTER_ID}.localhost",
+    # Add host in development environment
+    # "Host": f"{CANISTER_ID}.localhost",
     "Content-Type": "application/json"
 }
 
