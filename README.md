@@ -1,10 +1,12 @@
-# USDX Vault App
+# NeuroVault: Revolutionizing Wealth Management
 
-A decentralized token vault and dividend distribution system built on the Internet Computer Protocol (ICP) using Motoko and React.
+NeuroVault presents a transformative solution for managing crypto assets effectively. Combining security, compliance, and advanced AI technologies, it addresses the complexities and risks often faced by investors, offering a streamlined and intelligent approach to wealth management in a volatile market.
+
 ## Fetch-ai Agent
-- Name: USDX-Vault-Agent
+
+- Name: NeuroVault Wealth management
 - Address: test-agent://agent1qtxg5zw949un6ewdahwucqwts4d39h6gz5d0hl8xeztcvpdf65ggjs25mdp
-![tag:innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3)
+  ![tag:innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3)
 
 ## Features
 
@@ -68,6 +70,18 @@ src/vault_app0_frontend/
 └── public/
 ```
 
+### AI Agent (Python)
+
+```
+src/fetch_ai/
+├── hello.py              # Main AI agent application
+├── mcp_function.py       # MCP (Model Context Protocol) functions
+├── mcp_setup.py          # MCP setup and configuration
+├── prompt_template.py    # AI prompt templates
+├── setup.py              # AI agent setup and deployment
+├── requirements.txt      # Python dependencies
+└── private_keys.json     # Private keys configuration
+```
 
 ## Getting Started
 
@@ -91,13 +105,14 @@ src/vault_app0_frontend/
    ```bash
    cp .env.example .env
    ```
-   
+
    Edit `.env` and configure the following variables according to your setup:
+
    ```bash
    # Required for AI chat agent
    ASI1_API_KEY='your-asi1-api-key-here'
    CANISTER_ID_VAULT_APP0_BACKEND='your-backend-canister-id'
-   
+
    # DFX environment variables (will be populated after deployment)
    CANISTER_ID_INTERNET_IDENTITY='your-identity-canister-id'
    CANISTER_ID_VAULT_APP0_FRONTEND='your-frontend-canister-id'
@@ -110,7 +125,7 @@ src/vault_app0_frontend/
    cd src/vault_app0_frontend
    npm install
    cd ../..
-   
+
    # AI agent dependencies
    cd src/fetch_ai
    pip install -r requirements.txt
@@ -138,8 +153,9 @@ src/vault_app0_frontend/
    cd src/fetch_ai
    python setup.py
    ```
-   
+
    The AI agent will be available at:
+
    - Chat endpoint: `http://localhost:8001/api/chat`
    - Health endpoint: `http://localhost:8001/health`
 
